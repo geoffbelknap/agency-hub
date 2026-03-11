@@ -1,0 +1,180 @@
+kind: connector
+name: slack-ops
+version: "1.0.0"
+description: >
+  Polls Slack channels for messages matching trigger patterns and routes
+  them to agents. Agents can read threads, post replies, react, and
+  search messages. Bidirectional — Slack is both a work source and an
+  output channel for agent teams.
+author: Agency
+
+requires:
+  services:
+    - slack
+
+source:
+  type: poll
+  url: "https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}&limit=20"
+  method: GET
+  headers:
+    Accept: application/json
+  interval: 1m
+  response_key: messages
+
+routes:
+  - match:
+      text: "@agency"
+    target:
+      agent: ops-coordinator
+    brief: "Slack request from {user}: {text}"
+    priority: normal
+
+  - match:
+      text:
+        - "urgent"
+        - "incident"
+        - "outage"
+        - "SEV"
+    target:
+      agent: ops-coordinator
+    brief: "Urgent Slack message: {text}"
+    priority: high
+    sla: 30m
+
+  - match:
+      text:
+        - "evaluate"
+        - "assessment"
+        - "compare"
+    target:
+      agent: ops-coordinator
+    brief: "Evaluation request: {text}"
+    priority: normal
+
+mcp:
+  name: slack
+  credential: slack
+  api_base: https://slack.com
+  tools:
+    - name: slack_list_channels
+      method: GET
+      path: /api/conversations.list
+      description: List public channels in the workspace.
+      parameters:
+        limit:
+          type: integer
+          description: Maximum channels to return (default 100)
+        cursor:
+          type: string
+          description: Pagination cursor
+
+    - name: slack_channel_history
+      method: GET
+      path: /api/conversations.history
+      description: Fetch recent messages from a channel.
+      parameters:
+        channel:
+          type: string
+          description: Channel ID
+          required: true
+        limit:
+          type: integer
+          description: Number of messages (default 20)
+        oldest:
+          type: string
+          description: Unix timestamp — messages after this time
+        latest:
+          type: string
+          description: Unix timestamp — messages before this time
+
+    - name: slack_post_message
+      method: POST
+      path: /api/chat.postMessage
+      description: Post a message to a Slack channel.
+      parameters:
+        channel:
+          type: string
+          description: Channel ID
+          required: true
+        text:
+          type: string
+          description: Message text (mrkdwn formatting)
+          required: true
+        thread_ts:
+          type: string
+          description: Parent message timestamp to reply in thread
+
+    - name: slack_get_thread
+      method: GET
+      path: /api/conversations.replies
+      description: Get all replies in a message thread.
+      parameters:
+        channel:
+          type: string
+          description: Channel ID
+          required: true
+        ts:
+          type: string
+          description: Parent message timestamp
+          required: true
+        limit:
+          type: integer
+          description: Number of replies (default 50)
+
+    - name: slack_add_reaction
+      method: POST
+      path: /api/reactions.add
+      description: Add an emoji reaction to a message.
+      parameters:
+        channel:
+          type: string
+          description: Channel ID
+          required: true
+        timestamp:
+          type: string
+          description: Message timestamp
+          required: true
+        name:
+          type: string
+          description: Emoji name without colons
+          required: true
+
+    - name: slack_user_info
+      method: GET
+      path: /api/users.info
+      description: Get information about a Slack user.
+      parameters:
+        user:
+          type: string
+          description: User ID
+          required: true
+
+    - name: slack_search_messages
+      method: GET
+      path: /api/search.messages
+      description: Search for messages across the workspace.
+      parameters:
+        query:
+          type: string
+          description: Search query
+          required: true
+        count:
+          type: integer
+          description: Results per page (default 20)
+        sort:
+          type: string
+          description: "Sort: score or timestamp"
+
+    - name: slack_channel_info
+      method: GET
+      path: /api/conversations.info
+      description: Get information about a channel.
+      parameters:
+        channel:
+          type: string
+          description: Channel ID
+          required: true
+
+rate_limits:
+  max_per_hour: 300
+  max_concurrent: 5

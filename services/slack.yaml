@@ -1,0 +1,191 @@
+service: slack
+display_name: Slack API
+api_base: https://slack.com
+description: >
+  Slack Web API. Credential is a Bot User OAuth Token (xoxb-...) from
+  a Slack App with appropriate scopes. See
+  https://api.slack.com/authentication/token-types#bot
+credential:
+  env_var: SLACK_BOT_TOKEN
+  header: Authorization
+  format: "Bearer {key}"
+  scoped_prefix: agency-scoped-slack
+usage_example: |
+  Create a Slack App at https://api.slack.com/apps with these bot token scopes:
+    channels:history, channels:read, chat:write, reactions:read, reactions:write,
+    users:read, files:read, files:write
+
+  Set SLACK_BOT_TOKEN to the Bot User OAuth Token (starts with xoxb-).
+
+  curl -s -H "X-Agency-Service: slack" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://slack.com/api/conversations.list"
+
+  See https://api.slack.com/methods
+tools:
+  - name: slack_list_channels
+    description: List public channels in the workspace.
+    parameters:
+      - name: limit
+        description: Maximum channels to return (default 100, max 1000)
+        required: false
+        default: "100"
+      - name: cursor
+        description: Pagination cursor for next page
+        required: false
+    method: GET
+    path: /api/conversations.list
+    query_params:
+      limit: limit
+      cursor: cursor
+      types: public_channel
+    response_path: channels
+  - name: slack_channel_history
+    description: Fetch recent messages from a channel.
+    parameters:
+      - name: channel
+        description: Channel ID (e.g. C01ABC123)
+        required: true
+      - name: limit
+        description: Number of messages to return (default 20, max 1000)
+        required: false
+        default: "20"
+      - name: oldest
+        description: Unix timestamp — only messages after this time
+        required: false
+      - name: latest
+        description: Unix timestamp — only messages before this time
+        required: false
+    method: GET
+    path: /api/conversations.history
+    query_params:
+      channel: channel
+      limit: limit
+      oldest: oldest
+      latest: latest
+    response_path: messages
+  - name: slack_post_message
+    description: Post a message to a Slack channel.
+    parameters:
+      - name: channel
+        description: Channel ID (e.g. C01ABC123)
+        required: true
+      - name: text
+        description: Message text (supports mrkdwn formatting)
+        required: true
+      - name: thread_ts
+        description: Timestamp of parent message to reply in thread
+        required: false
+    method: POST
+    path: /api/chat.postMessage
+  - name: slack_reply_thread
+    description: Reply to a message thread.
+    parameters:
+      - name: channel
+        description: Channel ID
+        required: true
+      - name: thread_ts
+        description: Timestamp of the parent message
+        required: true
+      - name: text
+        description: Reply text (supports mrkdwn formatting)
+        required: true
+    method: POST
+    path: /api/chat.postMessage
+  - name: slack_add_reaction
+    description: Add an emoji reaction to a message.
+    parameters:
+      - name: channel
+        description: Channel ID
+        required: true
+      - name: timestamp
+        description: Timestamp of the message to react to
+        required: true
+      - name: name
+        description: Emoji name without colons (e.g. eyes, white_check_mark)
+        required: true
+    method: POST
+    path: /api/reactions.add
+  - name: slack_get_thread
+    description: Get all replies in a message thread.
+    parameters:
+      - name: channel
+        description: Channel ID
+        required: true
+      - name: ts
+        description: Timestamp of the parent message
+        required: true
+      - name: limit
+        description: Number of replies to return (default 50)
+        required: false
+        default: "50"
+    method: GET
+    path: /api/conversations.replies
+    query_params:
+      channel: channel
+      ts: ts
+      limit: limit
+    response_path: messages
+  - name: slack_user_info
+    description: Get information about a Slack user.
+    parameters:
+      - name: user
+        description: User ID (e.g. U01ABC123)
+        required: true
+    method: GET
+    path: /api/users.info
+    query_params:
+      user: user
+    response_path: user
+  - name: slack_search_messages
+    description: Search for messages across the workspace.
+    parameters:
+      - name: query
+        description: Search query string
+        required: true
+      - name: count
+        description: Number of results per page (default 20, max 100)
+        required: false
+        default: "20"
+      - name: sort
+        description: "Sort order: score or timestamp (default: score)"
+        required: false
+        default: score
+    method: GET
+    path: /api/search.messages
+    query_params:
+      query: query
+      count: count
+      sort: sort
+    response_path: messages.matches
+  - name: slack_upload_file
+    description: Upload a file to a channel.
+    parameters:
+      - name: channels
+        description: Comma-separated channel IDs to share the file in
+        required: true
+      - name: content
+        description: File content as text
+        required: true
+      - name: filename
+        description: Filename
+        required: true
+      - name: title
+        description: Title of the file
+        required: false
+      - name: initial_comment
+        description: Message text to accompany the file
+        required: false
+    method: POST
+    path: /api/files.upload
+  - name: slack_channel_info
+    description: Get information about a channel.
+    parameters:
+      - name: channel
+        description: Channel ID (e.g. C01ABC123)
+        required: true
+    method: GET
+    path: /api/conversations.info
+    query_params:
+      channel: channel
+    response_path: channel
