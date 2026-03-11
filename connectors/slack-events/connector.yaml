@@ -1,0 +1,74 @@
+kind: connector
+name: slack-events
+version: "1.0.0"
+description: >
+  Receives Slack Events API webhooks for real-time message delivery.
+  Unlike slack-ops (which polls), this receives events immediately via
+  push — no polling delay, no duplicate detection needed, scales cleanly.
+
+  Requires:
+    - A public HTTPS endpoint pointing to this intake server
+      (e.g. ngrok, Cloudflare Tunnel, or a reverse proxy)
+    - Slack app configured with Events API URL:
+        https://<your-host>/webhooks/slack-events
+    - Event subscriptions: message.channels (and message.groups if needed)
+    - SLACK_SIGNING_SECRET env var set to the app's signing secret
+
+  The intake handles the Slack URL verification challenge automatically.
+  HMAC-SHA256 signature verification is enforced on all events.
+author: Agency
+
+requires:
+  services:
+    - slack
+
+source:
+  type: webhook
+  webhook_auth:
+    type: hmac_sha256
+    secret_env: SLACK_SIGNING_SECRET
+    header: X-Slack-Signature
+    timestamp_header: X-Slack-Request-Timestamp
+    prefix: "v0="
+    challenge_field: challenge
+
+routes:
+  # Route @mentions of your bot to the target agent
+  - match:
+      type: message
+      bot_id: null
+      subtype: null
+      text: "re:<@U0YOURBOTUSERID>"
+    target:
+      agent: slack-agent
+    brief: >
+      A Slack message mentioning the bot.
+      From user: {{ event.user }}
+      Message: {{ event.text }}
+      Thread timestamp: {{ event.ts }}
+      Channel: {{ event.channel }}
+
+      Respond in the same thread:
+        channel: {{ event.channel }}
+        thread_ts: {{ event.ts }}
+
+  # Route urgent messages with high priority
+  - match:
+      type: message
+      bot_id: null
+      subtype: null
+      text:
+        - "urgent"
+        - "incident"
+        - "outage"
+    target:
+      agent: slack-agent
+    brief: >
+      Urgent Slack message: {{ event.text }}
+      From: {{ event.user }} in {{ event.channel }}
+    priority: high
+    sla: 15m
+
+rate_limits:
+  max_per_hour: 1000
+  max_concurrent: 20
