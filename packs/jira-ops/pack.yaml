@@ -1,0 +1,83 @@
+kind: pack
+name: jira-ops
+version: "1.0.0"
+description: >
+  Ops team that owns a Jira queue for system evaluations, compliance and risk
+  management, and ad-hoc task and incident handling. Polls Jira for new work,
+  routes by issue type and priority, and posts findings back to tickets.
+author: Agency
+
+requires:
+  connectors:
+    - jira-ops
+  services:
+    - jira
+
+credentials:
+  - name: jira
+    description: >
+      Jira Cloud API token. Base64-encode "email@example.com:api-token"
+      and provide the encoded string.
+    required: true
+
+team:
+  name: jira-ops
+  agents:
+    - name: ops-coordinator
+      preset: coordinator
+      role: coordinator
+      connectors:
+        - jira-ops
+      skills: []
+
+    - name: jira-admin
+      preset: ops
+      role: standard
+      connectors:
+        - jira-ops
+      skills: []
+
+    - name: evaluator
+      preset: analyst
+      role: standard
+      connectors:
+        - jira-ops
+      skills: []
+
+    - name: compliance-analyst
+      preset: compliance-auditor
+      role: standard
+      connectors:
+        - jira-ops
+      skills: []
+
+    - name: ops-responder
+      preset: ops
+      role: standard
+      connectors:
+        - jira-ops
+      skills: []
+
+    - name: risk-monitor
+      preset: function
+      role: function
+      connectors:
+        - jira-ops
+      skills: []
+
+  channels:
+    - name: ops-general
+      topic: Team coordination and status updates
+
+    - name: evaluations
+      topic: System and tool evaluation work
+
+    - name: compliance
+      topic: Compliance reviews and risk assessments
+
+    - name: incidents
+      topic: Incident triage and response
+
+    - name: escalations
+      topic: Items requiring human attention
+      private: true

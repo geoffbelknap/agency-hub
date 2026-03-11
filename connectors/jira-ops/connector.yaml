@@ -1,0 +1,187 @@
+kind: connector
+name: jira-ops
+version: "1.0.0"
+description: Polls a Jira Cloud project for new and updated issues and routes them to an ops team by issue type and priority.
+author: Agency
+
+requires:
+  services:
+    - jira
+
+source:
+  type: poll
+  url: "https://${JIRA_DOMAIN}.atlassian.net/rest/api/3/search?jql=project=${JIRA_PROJECT_KEY}+AND+status+!=+Done+AND+updated+>=-5m&fields=summary,status,issuetype,priority,assignee,labels,created,updated"
+  method: GET
+  headers:
+    Accept: application/json
+  interval: 5m
+  response_key: issues
+
+routes:
+  - match:
+      issuetype.name: Evaluation
+    target:
+      agent: evaluator
+    brief: "New evaluation request: {summary}"
+    priority: normal
+
+  - match:
+      issuetype.name:
+        - "Compliance Review"
+        - "Risk Assessment"
+    target:
+      agent: compliance-analyst
+    brief: "Compliance/risk item: {summary}"
+    priority: normal
+
+  - match:
+      priority.name:
+        - Highest
+        - High
+      issuetype.name:
+        - Incident
+        - Bug
+    target:
+      agent: ops-responder
+    brief: "Urgent incident: {summary}"
+    priority: high
+    sla: 1h
+
+  - match:
+      issuetype.name:
+        - Task
+        - Story
+        - Bug
+        - Incident
+    target:
+      agent: ops-coordinator
+    brief: "Ops task: {summary}"
+    priority: normal
+
+mcp:
+  name: jira
+  credential: jira
+  api_base: "https://${JIRA_DOMAIN}.atlassian.net"
+  tools:
+    - name: jira_search
+      method: GET
+      path: /rest/api/3/search
+      description: Search for issues using JQL.
+      parameters:
+        jql:
+          type: string
+          description: JQL query string
+          required: true
+        maxResults:
+          type: integer
+          description: Maximum results (default 50)
+        fields:
+          type: string
+          description: Comma-separated fields to return
+
+    - name: jira_get_issue
+      method: GET
+      path: "/rest/api/3/issue/{issue_key}"
+      description: Get full details for a Jira issue including comments.
+      parameters:
+        issue_key:
+          type: string
+          description: "Issue key (e.g. OPS-42)"
+          required: true
+
+    - name: jira_add_comment
+      method: POST
+      path: "/rest/api/3/issue/{issue_key}/comment"
+      description: Add a comment to a Jira issue.
+      parameters:
+        issue_key:
+          type: string
+          description: "Issue key (e.g. OPS-42)"
+          required: true
+        body:
+          type: object
+          description: Comment body in Atlassian Document Format
+          required: true
+
+    - name: jira_get_transitions
+      method: GET
+      path: "/rest/api/3/issue/{issue_key}/transitions"
+      description: Get available status transitions for an issue.
+      parameters:
+        issue_key:
+          type: string
+          description: "Issue key (e.g. OPS-42)"
+          required: true
+
+    - name: jira_transition
+      method: POST
+      path: "/rest/api/3/issue/{issue_key}/transitions"
+      description: Transition an issue to a new status.
+      parameters:
+        issue_key:
+          type: string
+          description: "Issue key (e.g. OPS-42)"
+          required: true
+        transition_id:
+          type: string
+          description: Transition ID from jira_get_transitions
+          required: true
+
+    - name: jira_assign
+      method: PUT
+      path: "/rest/api/3/issue/{issue_key}/assignee"
+      description: Assign an issue to a user.
+      parameters:
+        issue_key:
+          type: string
+          description: "Issue key (e.g. OPS-42)"
+          required: true
+        account_id:
+          type: string
+          description: Atlassian account ID
+          required: true
+
+    - name: jira_create_issue
+      method: POST
+      path: /rest/api/3/issue
+      description: Create a new Jira issue.
+      parameters:
+        project_key:
+          type: string
+          description: "Project key (e.g. OPS)"
+          required: true
+        summary:
+          type: string
+          description: Issue summary
+          required: true
+        issue_type:
+          type: string
+          description: "Issue type (e.g. Task, Bug, Evaluation)"
+          required: true
+        description:
+          type: object
+          description: Description in Atlassian Document Format
+
+    - name: jira_get_project
+      method: GET
+      path: "/rest/api/3/project/{project_key}"
+      description: Get project details including issue types and workflows.
+      parameters:
+        project_key:
+          type: string
+          description: "Project key (e.g. OPS)"
+          required: true
+
+    - name: jira_get_issue_types
+      method: GET
+      path: "/rest/api/3/project/{project_key}/statuses"
+      description: Get all issue types and their statuses for a project.
+      parameters:
+        project_key:
+          type: string
+          description: "Project key (e.g. OPS)"
+          required: true
+
+rate_limits:
+  max_per_hour: 500
+  max_concurrent: 5

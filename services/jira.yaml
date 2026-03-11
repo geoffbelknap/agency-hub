@@ -1,0 +1,124 @@
+service: jira
+display_name: Jira Cloud API
+api_base: https://YOUR_DOMAIN.atlassian.net
+description: >
+  Jira Cloud REST API v3. Credential is a base64-encoded
+  "email@example.com:api-token" string for Basic auth.
+credential:
+  env_var: JIRA_API_TOKEN
+  header: Authorization
+  format: "Basic {key}"
+  scoped_prefix: agency-scoped-jira
+usage_example: |
+  Set JIRA_API_TOKEN to the base64 encoding of "email@example.com:your-api-token".
+
+  curl -s -H "X-Agency-Service: jira" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://YOUR_DOMAIN.atlassian.net/rest/api/3/search?jql=project=OPS"
+
+  See https://developer.atlassian.com/cloud/jira/platform/rest/v3/
+tools:
+  - name: jira_search
+    description: Search for issues using JQL.
+    parameters:
+      - name: jql
+        description: JQL query string
+        required: true
+      - name: max_results
+        description: Maximum results to return (default 50, max 100)
+        required: false
+        default: "50"
+      - name: fields
+        description: Comma-separated list of fields to return
+        required: false
+        default: "summary,status,issuetype,priority,assignee,created,updated"
+    method: GET
+    path: /rest/api/3/search
+    query_params:
+      jql: jql
+      maxResults: max_results
+      fields: fields
+    response_path: issues
+  - name: jira_get_issue
+    description: Get full details for a Jira issue.
+    parameters:
+      - name: issue_key
+        description: "Issue key (e.g. OPS-42)"
+        required: true
+    method: GET
+    path: /rest/api/3/issue/{issue_key}
+  - name: jira_add_comment
+    description: Add a comment to a Jira issue.
+    parameters:
+      - name: issue_key
+        description: "Issue key (e.g. OPS-42)"
+        required: true
+      - name: body
+        description: Comment text (Atlassian Document Format JSON or plain text)
+        required: true
+    method: POST
+    path: /rest/api/3/issue/{issue_key}/comment
+  - name: jira_get_transitions
+    description: Get available status transitions for an issue.
+    parameters:
+      - name: issue_key
+        description: "Issue key (e.g. OPS-42)"
+        required: true
+    method: GET
+    path: /rest/api/3/issue/{issue_key}/transitions
+    response_path: transitions
+  - name: jira_transition
+    description: Transition an issue to a new status.
+    parameters:
+      - name: issue_key
+        description: "Issue key (e.g. OPS-42)"
+        required: true
+      - name: transition_id
+        description: Transition ID (get from jira_get_transitions)
+        required: true
+    method: POST
+    path: /rest/api/3/issue/{issue_key}/transitions
+  - name: jira_assign
+    description: Assign an issue to a user.
+    parameters:
+      - name: issue_key
+        description: "Issue key (e.g. OPS-42)"
+        required: true
+      - name: account_id
+        description: Atlassian account ID of the assignee
+        required: true
+    method: PUT
+    path: /rest/api/3/issue/{issue_key}/assignee
+  - name: jira_get_issue_types
+    description: Get all issue types and their statuses for a project.
+    parameters:
+      - name: project_key
+        description: "Project key (e.g. OPS)"
+        required: true
+    method: GET
+    path: /rest/api/3/project/{project_key}/statuses
+  - name: jira_create_issue
+    description: Create a new Jira issue.
+    parameters:
+      - name: project_key
+        description: "Project key (e.g. OPS)"
+        required: true
+      - name: summary
+        description: Issue summary/title
+        required: true
+      - name: issue_type
+        description: "Issue type name (e.g. Task, Bug, Story)"
+        required: true
+      - name: description
+        description: Issue description (Atlassian Document Format JSON or plain text)
+        required: false
+    method: POST
+    path: /rest/api/3/issue
+  - name: jira_get_project
+    description: Get project details including issue types and workflows.
+    parameters:
+      - name: project_key
+        description: "Project key (e.g. OPS)"
+        required: true
+    method: GET
+    path: /rest/api/3/project/{project_key}
