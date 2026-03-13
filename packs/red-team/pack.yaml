@@ -44,3 +44,9 @@ team:
     - name: red-team-escalations
       topic: Items requiring human decision before proceeding
       private: true
+
+# Optional: activate to surface escalations in Slack in real-time.
+# Requires SLACK_BOT_TOKEN and SLACK_ESCALATION_CHANNEL_ID env vars.
+# Run: agency connector activate red-team-escalations-to-slack
+recommended_connectors:
+  - red-team-escalations-to-slack
