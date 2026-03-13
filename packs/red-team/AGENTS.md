@@ -47,6 +47,50 @@ Do not declare completion just because you've confirmed a handful of vulnerabili
 
 ---
 
+## Cross-Agent Collaboration
+
+Agents learn from each other through two mechanisms:
+
+### 1. Knowledge Graph (primary — async)
+
+Every finding contributed to the knowledge graph is available to all agents.
+Before starting any task, query the graph to get full context including what
+peers have found:
+
+```
+query_knowledge("juice-shop vulnerabilities")
+query_knowledge("juice-shop <specific area you're about to probe>")
+```
+
+This means recon benefits from exploit's confirmation results, and exploit
+benefits from recon's enumeration before starting. **Always query first.**
+
+### 2. Coordinator-Routed Insights (for real-time cross-pollination)
+
+If you notice a peer's finding that opens up new work in your own domain,
+do NOT respond inline in `#red-team-findings`. Instead:
+
+1. Post to `#red-team-ops` addressed to `@red-team-coordinator`:
+   ```
+   @red-team-coordinator — Insight from peer finding: [what you noticed and
+   why it suggests follow-on work in your domain]. Suggest: [what you'd do].
+   Awaiting tasking decision.
+   ```
+2. The coordinator decides whether to task it out or defer it.
+
+**Examples of cross-pollination worth surfacing:**
+- Recon notices exploit confirmed JWT alg:none → suggests probing which endpoints
+  lack JWT enforcement entirely (new recon vector)
+- Exploit notices recon found a KeePass file in FTP → suggests cracking it
+  for credentials usable elsewhere (new exploit vector)
+- Either agent notices a vuln that combines with a prior finding to create
+  a higher-severity attack chain → coordinator should know
+
+**What NOT to surface:** general acknowledgment, analysis the other agent
+already covered, or insights that don't create new tasked work.
+
+---
+
 ## Required Behaviors
 
 ### Knowledge Contribution (all agents)
