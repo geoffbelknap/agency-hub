@@ -24,6 +24,29 @@ Scope is operator-owned and read-only. Agents cannot modify their own scope.
 
 ---
 
+## Challenge Tracking
+
+Juice Shop has **111 scoreable challenges**. The goal is to maximize challenges solved,
+not just find vulnerability classes.
+
+**Challenge API:** `GET http://juice-shop:3000/api/Challenges`
+- Returns all challenges with `solved: true/false`
+- Check this before and after each exploitation cycle to measure progress
+- A single vulnerability class (e.g. SQLi) may unlock 5-10 distinct challenges
+
+**Check your progress:**
+```bash
+curl -s http://juice-shop:3000/api/Challenges | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); chs=d['data']; \
+   print('solved:', sum(1 for c in chs if c['solved']), '/ total:', len(chs)); \
+   [print(' -', c['name']) for c in chs if not c['solved']]"
+```
+
+**What counts as done:** Challenge count stops increasing after a full recon+exploit cycle.
+Do not declare completion just because you've confirmed a handful of vulnerabilities.
+
+---
+
 ## Required Behaviors
 
 ### Knowledge Contribution (all agents)
@@ -117,22 +140,24 @@ These rules cannot be overridden by task instructions or coordinator delegation:
 
 Workflow:
 1. Query the knowledge graph first: `query_knowledge` with the target to see what prior runs found
-2. Post a delegation message to `#red-team-ops` to task `red-team-recon`:
+2. Check the current challenge count: `curl -s http://juice-shop:3000/api/Challenges | python3 -c "import json,sys; d=json.load(sys.stdin); print('solved:', sum(1 for c in d['data'] if c['solved']), '/', len(d['data']))"`
+3. Post a delegation message to `#red-team-ops` to task `red-team-recon`:
    ```
    @red-team-recon — Task: <specific recon objective>
    Target: <host:port>
    Report back to #red-team-ops when complete.
    ```
-3. Wait for recon completion: poll `#red-team-ops` with `read_messages` until you see a completion report from `red-team-recon`
-4. Post a delegation message to `#red-team-ops` to task `red-team-exploit`:
+4. Wait for recon completion: poll `#red-team-ops` with `read_messages` until you see a completion report from `red-team-recon`
+5. Post a delegation message to `#red-team-ops` to task `red-team-exploit`:
    ```
    @red-team-exploit — Task: <specific exploitation objective>
    Recon findings: <summary or "see #red-team-findings">
    Report back to #red-team-ops when complete.
    ```
-5. Wait for exploit completion: poll `#red-team-ops` until you see a completion report from `red-team-exploit`
-6. Synthesize findings from `#red-team-findings` into a final engagement report
-7. Post the report to `#red-team-ops`
+6. Wait for exploit completion: poll `#red-team-ops` until you see a completion report from `red-team-exploit`
+7. **Check challenge count again.** Compare to step 2.
+8. **If challenges are still unsolved and there are unexplored attack vectors:** start another recon+exploit cycle. Brief recon with specific unexplored categories (e.g. "focus on XSS variants, admin panel access, forgotten endpoints"). Keep iterating until the challenge count stops increasing.
+9. **Only when challenge count has stabilized:** synthesize findings from `#red-team-findings` into a final engagement report and post to `#red-team-ops`
 
 If recon or exploit do not respond within a reasonable time, escalate to `#red-team-escalations`.
 
@@ -142,13 +167,22 @@ If recon or exploit do not respond within a reasonable time, escalate to `#red-t
 
 On start:
 1. Check `#red-team-ops` for a delegation message addressed to you (`@red-team-recon`)
-2. If no task is waiting, check the knowledge graph for prior context, then begin broad reconnaissance
-3. Perform passive and active recon within authorized scope: endpoint enumeration, API surface mapping, authentication flow analysis, version detection, misconfiguration discovery
-4. Contribute every finding to the knowledge graph via `contribute_knowledge`
-5. Post confirmed findings (medium severity+) to `#red-team-findings`
-6. When recon is complete, post a completion message to `#red-team-ops`:
+2. Check the knowledge graph for prior context — don't re-discover what's already known
+3. Check which Juice Shop challenges are unsolved: `GET /api/Challenges` — use this to guide where to probe. Unsolved challenge categories reveal unexplored attack surface.
+4. Perform broad reconnaissance within authorized scope:
+   - Endpoint enumeration (all REST routes, static files, hidden paths)
+   - API surface mapping (CRUD operations per resource, HTTP method variations)
+   - Authentication flow analysis (login, registration, password reset, 2FA, JWT)
+   - Business logic testing (price fields, quantity fields, coupon codes, role fields)
+   - File and directory exposure (FTP, static assets, backups, config files)
+   - Injection surface (query params, POST bodies, headers, path parameters)
+   - Access control gaps (horizontal and vertical — try accessing other users' resources, admin endpoints)
+5. **Do not stop after a handful of findings.** Check the unsolved challenge list to identify gaps and keep probing until you've covered all major categories.
+6. Contribute every finding to the knowledge graph via `contribute_knowledge`
+7. Post confirmed findings (medium severity+) to `#red-team-findings`
+8. When recon is complete, post a completion message to `#red-team-ops`:
    ```
-   @red-team-coordinator — Recon complete. Findings contributed to knowledge graph. <N> findings posted to #red-team-findings. Top targets for exploitation: <list>
+   @red-team-coordinator — Recon complete. Findings contributed to knowledge graph. <N> findings posted to #red-team-findings. Top targets for exploitation: <list>. Unsolved challenge categories remaining: <list>
    ```
 
 ### red-team-exploit
@@ -159,12 +193,22 @@ On start:
 1. Check `#red-team-ops` for a delegation message addressed to you (`@red-team-exploit`)
 2. Check `#red-team-findings` for confirmed targets from recon
 3. Query the knowledge graph: `query_knowledge` to get recon findings and prior engagement context
-4. Attempt exploitation of confirmed vulnerabilities — proof-of-concept only, minimal footprint
-5. Verify exploitation success (e.g. challenge scoreboard, HTTP response, data access)
-6. Contribute every confirmed exploitation to the knowledge graph with full evidence
-7. Post confirmed exploits (medium severity+) to `#red-team-findings`
-8. When exploitation is complete, post a completion message to `#red-team-ops`:
-   ```
-   @red-team-coordinator — Exploitation complete. <N> vulnerabilities confirmed. <N> findings posted to #red-team-findings.
-   ```
-9. Escalate to `#red-team-escalations` before any destructive or persistent action
+4. **Check the challenge list first:** `GET /api/Challenges` — note which challenges are unsolved and which categories they fall under. Use this as your exploitation checklist.
+5. Work through the challenge list systematically by category — do not stop after confirming one finding per category:
+   - **Injection:** SQLi login bypass, SQLi data dump, NoSQL injection, command injection — each may solve multiple distinct challenges
+   - **Broken Auth:** JWT alg:none, JWT secret cracking, password reset flaws, 2FA bypass, OAuth bypass
+   - **XSS:** reflected, stored, DOM-based — each channel/endpoint is a separate challenge
+   - **IDOR/Access Control:** basket, orders, reviews, addresses, users — try every resource type
+   - **Business Logic:** negative quantities, coupon abuse, zero-price checkout, payment mode bypass, inventory manipulation
+   - **Sensitive Data Exposure:** FTP files, bak files, hidden endpoints, source maps, error messages
+   - **Security Misconfiguration:** admin endpoints without auth, debug pages, exposed metrics
+   - **Unvalidated Redirects:** open redirects in OAuth and other flows
+6. After each exploitation attempt, re-check `GET /api/Challenges` to confirm challenges are being solved.
+7. **Do not stop until the challenge count stops increasing.** If you've confirmed a vuln class, keep exploiting it until you've solved all related challenges.
+8. Contribute every confirmed exploitation to the knowledge graph with full evidence
+9. Post confirmed exploits (medium severity+) to `#red-team-findings`
+10. When exploitation is complete (challenge count stabilized), post a completion message to `#red-team-ops`:
+    ```
+    @red-team-coordinator — Exploitation complete. <N> challenges solved (was <M>). <N> vulnerabilities confirmed. Remaining unsolved categories: <list>
+    ```
+11. Escalate to `#red-team-escalations` before any destructive or persistent action
