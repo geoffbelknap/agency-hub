@@ -1,0 +1,47 @@
+kind: pack
+name: red-team
+version: "1.0.0"
+description: >
+  Red team coordination pack for authorized security testing. A coordinator
+  delegates reconnaissance and exploitation tasks to specialist agents. All
+  findings are contributed to the organizational knowledge graph so prior work
+  compounds across engagements.
+author: Agency
+
+requires:
+  presets:
+    - coordinator
+    - analyst
+    - security-reviewer
+
+team:
+  name: red-team
+  agents:
+    - name: red-team-coordinator
+      preset: coordinator
+      role: coordinator
+      connectors: []
+      skills: []
+
+    - name: red-team-recon
+      preset: analyst
+      role: standard
+      connectors: []
+      skills: []
+
+    - name: red-team-exploit
+      preset: security-reviewer
+      role: standard
+      connectors: []
+      skills: []
+
+  channels:
+    - name: red-team-ops
+      topic: Coordination, task delegation, and status updates
+
+    - name: red-team-findings
+      topic: Confirmed vulnerabilities, attack paths, and exploitation results
+
+    - name: red-team-escalations
+      topic: Items requiring human decision before proceeding
+      private: true
