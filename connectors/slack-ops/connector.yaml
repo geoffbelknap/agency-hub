@@ -10,7 +10,8 @@ description: >
   Includes thread reply polling: after each main poll, fetches replies
   for any message with reply_count > 0, so @mentions inside threads are
   also routed. Deduplicates by message ts to prevent reply loops.
-author: Agency
+author: geoffbelknap
+license: Apache-2.0
 
 requires:
   services:

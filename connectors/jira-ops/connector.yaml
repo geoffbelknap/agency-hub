@@ -2,7 +2,8 @@ kind: connector
 name: jira-ops
 version: "1.0.0"
 description: Polls a Jira Cloud project for new and updated issues and routes them to an ops team by issue type and priority.
-author: Agency
+author: geoffbelknap
+license: Apache-2.0
 
 requires:
   services:

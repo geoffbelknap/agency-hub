@@ -1,6 +1,8 @@
 service: slack
 display_name: Slack API
 api_base: https://slack.com
+author: geoffbelknap
+license: Apache-2.0
 description: >
   Slack Web API. Credential is a Bot User OAuth Token (xoxb-...) from
   a Slack App with appropriate scopes. See

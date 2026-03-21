@@ -6,7 +6,8 @@ description: >
   delegates reconnaissance and exploitation tasks to specialist agents. All
   findings are contributed to the organizational knowledge graph so prior work
   compounds across engagements.
-author: Agency
+author: geoffbelknap
+license: Apache-2.0
 
 requires:
   presets:

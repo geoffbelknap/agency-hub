@@ -5,7 +5,8 @@ description: >
   Ops team that owns a Jira queue for system evaluations, compliance and risk
   management, and ad-hoc task and incident handling. Polls Jira for new work,
   routes by issue type and priority, and posts findings back to tickets.
-author: Agency
+author: geoffbelknap
+license: Apache-2.0
 
 requires:
   connectors:

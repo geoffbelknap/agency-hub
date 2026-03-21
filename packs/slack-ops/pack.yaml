@@ -6,7 +6,8 @@ description: >
   evaluation tasks. Agents read threads, investigate, and post findings
   back to Slack. Bidirectional — Slack is both the work source and the
   human communication channel.
-author: Agency
+author: geoffbelknap
+license: Apache-2.0
 
 requires:
   connectors:

@@ -13,7 +13,8 @@ description: >
   Activate after deploying the red-team pack:
     agency connector activate red-team-escalations-to-slack
 
-author: Agency
+author: geoffbelknap
+license: Apache-2.0
 
 requires:
   services:
