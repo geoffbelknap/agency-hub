@@ -1,6 +1,6 @@
 service: jira
 display_name: Jira Cloud API
-api_base: https://YOUR_DOMAIN.atlassian.net
+api_base: "https://${JIRA_DOMAIN}.atlassian.net"
 author: geoffbelknap
 license: Apache-2.0
 description: >
@@ -13,10 +13,11 @@ credential:
   scoped_prefix: agency-scoped-jira
 usage_example: |
   Set JIRA_API_TOKEN to the base64 encoding of "email@example.com:your-api-token".
+  Set JIRA_DOMAIN to your Jira subdomain (e.g. "mycompany" for mycompany.atlassian.net).
 
   curl -s -H "X-Agency-Service: jira" \
     -H "Authorization: Bearer {scoped_token}" \
-    "https://YOUR_DOMAIN.atlassian.net/rest/api/3/search?jql=project=OPS"
+    "https://${JIRA_DOMAIN}.atlassian.net/rest/api/3/search?jql=project=OPS"
 
   See https://developer.atlassian.com/cloud/jira/platform/rest/v3/
 tools:
