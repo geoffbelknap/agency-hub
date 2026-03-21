@@ -13,7 +13,7 @@ description: >
     - Mirror all messages: set pattern to ".*"
     - Quiet mode: set pattern to match only priority keywords or
       disable the connector to suppress Slack noise entirely.
-author: geoffbelknap
+author: Geoff Belknap
 license: Apache-2.0
 
 requires:
