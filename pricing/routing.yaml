@@ -1,6 +1,7 @@
-# Agency LLM routing config — default pricing as of March 2026
-# Prices are per million tokens (MTok) in USD.
-# Override per-model costs or add providers by editing this file.
+# Agency LLM routing config — managed by agency hub update
+# DO NOT EDIT — this file is overwritten on every hub update.
+# For custom providers, models, or pricing overrides, use routing.local.yaml
+# Prices are per million tokens (MTok) in USD. Updated March 2026.
 version: "0.1"
 providers:
   anthropic:
