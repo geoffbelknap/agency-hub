@@ -1,12 +1,18 @@
-# LLM API Pricing — updated 2026-03-14
-# Prices per million tokens (MTok) in USD.
-# Synced via `agency hub update`. Gateway reads this for cost estimates.
-#
-# Sources: provider pricing pages (Anthropic, OpenAI, Google)
-# See: agency-workspace/llm-pricing-2026-03-14.md for full reference
-
-version: "2026-03-14"
-
+# Agency LLM routing config — default pricing as of March 2026
+# Prices are per million tokens (MTok) in USD.
+# Override per-model costs or add providers by editing this file.
+version: "0.1"
+providers:
+  anthropic:
+    api_base: https://api.anthropic.com/v1
+    auth_env: ANTHROPIC_API_KEY
+    auth_header: x-api-key
+    auth_prefix: ""
+  openai:
+    api_base: https://api.openai.com/v1
+    auth_env: OPENAI_API_KEY
+    auth_header: Authorization
+    auth_prefix: "Bearer "
 models:
   # Anthropic
   claude-sonnet:
@@ -15,21 +21,18 @@ models:
     cost_per_mtok_in: 3.0
     cost_per_mtok_out: 15.0
     cost_per_mtok_cached: 0.30
-
   claude-opus:
     provider: anthropic
     provider_model: claude-opus-4-20250514
     cost_per_mtok_in: 5.0
     cost_per_mtok_out: 25.0
     cost_per_mtok_cached: 0.50
-
   claude-haiku:
     provider: anthropic
     provider_model: claude-haiku-4-5-20251001
     cost_per_mtok_in: 1.0
     cost_per_mtok_out: 5.0
     cost_per_mtok_cached: 0.10
-
   # OpenAI
   gpt-4o:
     provider: openai
@@ -37,60 +40,27 @@ models:
     cost_per_mtok_in: 2.50
     cost_per_mtok_out: 10.0
     cost_per_mtok_cached: 1.25
-
   gpt-4o-mini:
     provider: openai
     provider_model: gpt-4o-mini
     cost_per_mtok_in: 0.15
     cost_per_mtok_out: 0.60
     cost_per_mtok_cached: 0.075
-
   gpt-4.1:
     provider: openai
     provider_model: gpt-4.1
     cost_per_mtok_in: 2.0
     cost_per_mtok_out: 8.0
     cost_per_mtok_cached: 0.50
-
   gpt-4.1-mini:
     provider: openai
     provider_model: gpt-4.1-mini
     cost_per_mtok_in: 0.40
     cost_per_mtok_out: 1.60
     cost_per_mtok_cached: 0.10
-
   gpt-4.1-nano:
     provider: openai
     provider_model: gpt-4.1-nano
     cost_per_mtok_in: 0.10
     cost_per_mtok_out: 0.40
     cost_per_mtok_cached: 0.025
-
-  gpt-5.4:
-    provider: openai
-    provider_model: gpt-5.4
-    cost_per_mtok_in: 2.50
-    cost_per_mtok_out: 15.0
-    cost_per_mtok_cached: 0.25
-
-  # Google
-  gemini-3-flash:
-    provider: google
-    provider_model: gemini-3-flash
-    cost_per_mtok_in: 0.50
-    cost_per_mtok_out: 3.0
-    cost_per_mtok_cached: 0.05
-
-  gemini-2.5-flash:
-    provider: google
-    provider_model: gemini-2.5-flash
-    cost_per_mtok_in: 0.30
-    cost_per_mtok_out: 2.50
-    cost_per_mtok_cached: 0.03
-
-  gemini-2.5-pro:
-    provider: google
-    provider_model: gemini-2.5-pro
-    cost_per_mtok_in: 1.25
-    cost_per_mtok_out: 10.0
-    cost_per_mtok_cached: 0.125
