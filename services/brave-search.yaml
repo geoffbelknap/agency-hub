@@ -1,0 +1,38 @@
+service: brave-search
+display_name: Brave Search API
+description: Web search via Brave Search. Returns titles, URLs, and descriptions for any query.
+api_base: https://api.search.brave.com
+credential:
+  env_var: BRAVE_API_KEY
+  header: X-Subscription-Token
+  scoped_prefix: agency-scoped-brave
+usage_example: |
+  curl -s -H "X-Agency-Service: brave-search" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://api.search.brave.com/res/v1/web/search?q=your+search+query"
+
+  Response is JSON with web.results[] containing title, url, description.
+  Use q= parameter with URL-encoded search terms. Results are paginated
+  with count= (default 10) and offset= parameters.
+tools:
+  - name: brave_web_search
+    description: Search the web using Brave Search. Returns web results with titles, URLs, and descriptions.
+    parameters:
+      - name: query
+        description: Search query string
+        required: true
+      - name: count
+        description: Number of results to return (default 10, max 20)
+        required: false
+        default: "10"
+      - name: offset
+        description: Pagination offset for results
+        required: false
+        default: "0"
+    method: GET
+    path: /res/v1/web/search
+    query_params:
+      query: q
+      count: count
+      offset: offset
+    response_path: web.results

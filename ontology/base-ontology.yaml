@@ -1,0 +1,271 @@
+version: 1
+name: default
+description: General-purpose ontology for knowledge worker agents
+last_modified: "2026-03-24T17:00:00Z"
+
+entity_types:
+  # People and Organizations
+  person:
+    description: An individual — operator, stakeholder, customer, team member
+    attributes: [name, role, location, timezone, preferences, contact]
+  organization:
+    description: A company, department, vendor, customer, or group
+    attributes: [name, type, industry, location]
+  team:
+    description: A group of people who work together
+    attributes: [name, purpose, members]
+  role:
+    description: A job function, responsibility, or expertise area
+    attributes: [title, scope, authority]
+  stakeholder:
+    description: Someone with interest or authority in a project or domain
+    attributes: [name, interest, influence, organization]
+  contact:
+    description: How to reach someone — email, slack handle, phone, timezone
+    attributes: [person, type, value, preferred]
+
+  # Systems and Infrastructure
+  system:
+    description: An application, platform, database, or repository
+    attributes: [name, type, owner, status, environment]
+  service:
+    description: An API, endpoint, or integration
+    attributes: [name, url, provider, status]
+  environment:
+    description: A deployment context — prod, staging, dev, region
+    attributes: [name, type, region]
+  configuration:
+    description: Settings, thresholds, or parameters that matter
+    attributes: [name, system, value, reason]
+  product:
+    description: A software product, hardware, or computing tool
+    attributes: [name, vendor, version, purpose]
+  credential:
+    description: An access grant or token — metadata only, never the value
+    attributes: [name, type, scope, expiry, owner]
+
+  # Work
+  project:
+    description: An ongoing initiative or body of work
+    attributes: [name, status, owner, deadline, stakeholders]
+  task:
+    description: A specific unit of work — ticket, issue, PR, request
+    attributes: [title, status, assignee, priority, source]
+  process:
+    description: How things actually get done — runbooks, workflows, SOPs
+    attributes: [name, steps, owner, frequency]
+  requirement:
+    description: Something that must be true — a constraint or acceptance criteria
+    attributes: [description, source, priority]
+  goal:
+    description: An objective, milestone, or target
+    attributes: [description, owner, deadline, status]
+
+  # Decisions and Context
+  decision:
+    description: A choice that was made, including rationale and who decided
+    attributes: [description, rationale, decided_by, date, alternatives_considered]
+  finding:
+    description: Something learned through investigation or research
+    attributes: [description, source, confidence, date]
+  preference:
+    description: How someone likes things done — communication style, priorities
+    attributes: [person, description, strength]
+  fact:
+    description: Verified information about the domain
+    attributes: [description, source, verified_date]
+  concept:
+    description: Domain terminology, mental models, or abstractions
+    attributes: [name, definition, context]
+  opinion:
+    description: Someone's stated position — not a fact but important context
+    attributes: [person, description, strength]
+  assumption:
+    description: Something believed true but not verified
+    attributes: [description, basis, risk_if_wrong]
+  terminology:
+    description: Domain jargon with definitions — prevents agent misinterpretation
+    attributes: [term, definition, context, common_confusion]
+
+  # Issues and Events
+  incident:
+    description: Something that went wrong
+    attributes: [title, severity, status, root_cause, resolution, date]
+  change:
+    description: A modification to a system, process, or configuration
+    attributes: [description, system, author, date, impact]
+  risk:
+    description: A potential problem to watch for
+    attributes: [description, likelihood, impact, mitigation]
+  event:
+    description: A meeting, deadline, release, or milestone
+    attributes: [name, date, participants, outcome]
+  schedule:
+    description: A recurring event or window — maintenance, on-call, business hours
+    attributes: [name, pattern, scope]
+
+  # Patterns and Learning
+  pattern:
+    description: A recurring theme agents have noticed
+    attributes: [description, frequency, significance, examples]
+  lesson:
+    description: Something learned from experience
+    attributes: [description, context, source_incident]
+  resolution:
+    description: How something was fixed
+    attributes: [description, incident, effectiveness]
+  workaround:
+    description: A temporary fix still in use
+    attributes: [description, for_issue, expiry, permanent_fix]
+  cause:
+    description: Why something happened — root cause analysis
+    attributes: [description, event, confidence]
+
+  # Living Context
+  narrative:
+    description: The ongoing story of a project, team, or initiative — updated as things evolve
+    attributes: [subject, current_state, last_updated]
+  priority:
+    description: What matters most right now and to whom
+    attributes: [description, owner, scope, expiry]
+  constraint:
+    description: A real-world limitation — budget, timeline, policy
+    attributes: [description, source, non_negotiable]
+  context:
+    description: Situational info — code freeze, reorg, incident in progress
+    attributes: [description, scope, expiry]
+  status:
+    description: Current state of something important
+    attributes: [subject, state, since, expected_resolution]
+  tension:
+    description: A known conflict or disagreement
+    attributes: [description, parties, impact]
+
+  # Documents and Artifacts
+  document:
+    description: A spec, report, runbook, wiki page, policy doc
+    attributes: [title, url, type, owner, last_updated]
+  artifact:
+    description: A file, repo, dashboard, board, or deliverable
+    attributes: [name, url, type, owner]
+  template:
+    description: A reusable pattern for a deliverable
+    attributes: [name, purpose, format]
+
+  # Rules and Standards
+  rule:
+    description: A business rule, policy, or hard constraint
+    attributes: [description, source, scope, exceptions]
+  metric:
+    description: Something measured and tracked — SLA, KPI, threshold
+    attributes: [name, value, target, unit, scope]
+  standard:
+    description: A compliance requirement, framework, or best practice
+    attributes: [name, source, scope, requirements]
+
+  # Location
+  location:
+    description: A physical or virtual place
+    attributes: [name, type, address, coordinates, timezone]
+
+  # Skills and Quantities
+  skill:
+    description: An ability or competency — useful for expertise matching
+    attributes: [name, level, person]
+  quantity:
+    description: A notable amount — budget, cost, measurement
+    attributes: [value, unit, context]
+  url:
+    description: A web address for reference
+    attributes: [url, description, type]
+
+relationship_types:
+  # Ownership and Authority
+  owns:
+    description: Has ownership of
+    inverse: owned_by
+  manages:
+    description: Manages or oversees
+    inverse: managed_by
+  responsible_for:
+    description: Is responsible for
+    inverse: responsibility_of
+  escalate_to:
+    description: Should escalate issues to
+    inverse: escalation_target_for
+
+  # Work and Assignment
+  works_on:
+    description: Is working on
+    inverse: worked_on_by
+  assigned_to:
+    description: Is assigned to
+    inverse: assigned_from
+  created_by:
+    description: Was created by
+    inverse: created
+  contributed_to:
+    description: Contributed to
+    inverse: received_contribution_from
+
+  # Dependencies and Structure
+  depends_on:
+    description: Depends on
+    inverse: depended_on_by
+  blocked_by:
+    description: Is blocked by
+    inverse: blocks
+  part_of:
+    description: Is part of
+    inverse: contains
+  relates_to:
+    description: Is related to
+    inverse: relates_to
+  supersedes:
+    description: Replaces or supersedes
+    inverse: superseded_by
+
+  # Knowledge and Causality
+  knows_about:
+    description: Has knowledge of
+    inverse: known_by
+  decided:
+    description: Made a decision about
+    inverse: decided_by
+  caused:
+    description: Caused or led to
+    inverse: caused_by
+  resolved_by:
+    description: Was resolved by
+    inverse: resolved
+  learned_from:
+    description: Was learned from
+    inverse: taught
+  triggered_by:
+    description: Was triggered by
+    inverse: triggers
+
+  # Reference and Documentation
+  documented_in:
+    description: Is documented in
+    inverse: documents
+  reported_by:
+    description: Was reported by
+    inverse: reported
+  located_in:
+    description: Is located in
+    inverse: location_of
+  uses:
+    description: Uses or employs
+    inverse: used_by
+  prefers:
+    description: Prefers or favors
+    inverse: preferred_by
+  scheduled_for:
+    description: Is scheduled for
+    inverse: schedule_of
+
+changelog:
+  - version: 1
+    date: "2026-03-24"
+    changes: Initial default ontology

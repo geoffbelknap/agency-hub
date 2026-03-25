@@ -1,0 +1,65 @@
+service: github
+display_name: GitHub API
+description: GitHub REST API. Query repos, issues, pull requests, and search code.
+api_base: https://api.github.com
+credential:
+  env_var: GITHUB_TOKEN
+  header: Authorization
+  format: "token {key}"
+  scoped_prefix: agency-scoped-github
+usage_example: |
+  curl -s -H "X-Agency-Service: github" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://api.github.com/repos/OWNER/REPO"
+
+  Response is JSON. See https://docs.github.com/en/rest for endpoints.
+tools:
+  - name: github_get_repo
+    description: Get information about a GitHub repository.
+    parameters:
+      - name: owner
+        description: Repository owner (user or organization)
+        required: true
+      - name: repo
+        description: Repository name
+        required: true
+    method: GET
+    path: /repos/{owner}/{repo}
+  - name: github_list_issues
+    description: List issues for a GitHub repository.
+    parameters:
+      - name: owner
+        description: Repository owner (user or organization)
+        required: true
+      - name: repo
+        description: Repository name
+        required: true
+      - name: state
+        description: "Filter by state: open, closed, or all (default: open)"
+        required: false
+        default: open
+      - name: per_page
+        description: Results per page (default 30, max 100)
+        required: false
+        default: "30"
+    method: GET
+    path: /repos/{owner}/{repo}/issues
+    query_params:
+      state: state
+      per_page: per_page
+  - name: github_search_code
+    description: Search for code across GitHub repositories.
+    parameters:
+      - name: query
+        description: Search query (GitHub code search syntax)
+        required: true
+      - name: per_page
+        description: Results per page (default 30, max 100)
+        required: false
+        default: "30"
+    method: GET
+    path: /search/code
+    query_params:
+      query: q
+      per_page: per_page
+    response_path: items
