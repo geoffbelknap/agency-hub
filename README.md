@@ -15,6 +15,16 @@ workspaces/     Workspace definitions
 pricing/        LLM model pricing (synced to routing.yaml by agency hub update)
 ```
 
+## Hub-Managed Files
+
+`agency hub update` syncs these files from the hub into `~/.agency/`. They are overwritten on every update — do not edit them directly.
+
+| File | Location | Operator customization |
+|------|----------|----------------------|
+| `routing.yaml` | `~/.agency/infrastructure/routing.yaml` | Use `routing.local.yaml` for custom providers, models, pricing |
+| Service definitions | `~/.agency/registry/services/*.yaml` | Create new files — don't edit hub-managed ones |
+| Base ontology | `~/.agency/knowledge/base-ontology.yaml` | Add files to `~/.agency/knowledge/ontology.d/` |
+
 ## Usage
 
 Add this hub source to `~/.agency/config.yaml`:

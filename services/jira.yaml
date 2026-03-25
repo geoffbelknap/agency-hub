@@ -1,3 +1,5 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
 service: jira
 display_name: Jira Cloud API
 api_base: "https://${JIRA_DOMAIN}.atlassian.net"

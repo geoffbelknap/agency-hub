@@ -1,3 +1,5 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
 service: brave-search
 display_name: Brave Search API
 description: Web search via Brave Search. Returns titles, URLs, and descriptions for any query.

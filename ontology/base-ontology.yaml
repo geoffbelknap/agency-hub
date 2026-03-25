@@ -1,3 +1,5 @@
+# Managed by agency hub — do not edit.
+# To extend the ontology, add custom files to ~/.agency/knowledge/ontology.d/
 version: 1
 name: default
 description: General-purpose ontology for knowledge worker agents

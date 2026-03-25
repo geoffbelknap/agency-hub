@@ -1,3 +1,5 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
 service: slack
 display_name: Slack API
 api_base: https://slack.com

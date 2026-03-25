@@ -1,3 +1,5 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
 service: github
 display_name: GitHub API
 description: GitHub REST API. Query repos, issues, pull requests, and search code.
