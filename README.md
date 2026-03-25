@@ -12,6 +12,7 @@ presets/        Agent preset definitions
 skills/         Agent skill packages
 policies/       Policy templates
 workspaces/     Workspace definitions
+pricing/        LLM model pricing (synced to routing.yaml by agency hub update)
 ```
 
 ## Usage
