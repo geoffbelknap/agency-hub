@@ -100,12 +100,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      # Gate: fail the job (and thus the required status check) if the
-      # review bot didn't auto-approve. This blocks merge until either:
-      #   - The connector is updated to pass auto-approve, OR
-      #   - A human approves the PR (satisfying the review requirement)
-      - name: Gate — block merge unless auto-approved
-        if: steps.review.outcome != 'success'
+      # Gate: fail only on validation errors (exit 1). Human-review (exit 2)
+      # passes the status check — branch protection's review requirement
+      # is the gate for those PRs, not the CI check.
+      - name: Gate — block merge on validation failure
+        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
         run: |
-          echo "Review bot did not auto-approve. Merge blocked until human review."
+          echo "Connector validation failed. Fix errors before merge."
           exit 1
