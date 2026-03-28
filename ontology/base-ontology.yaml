@@ -1,9 +1,9 @@
 # Managed by agency hub — do not edit.
 # To extend the ontology, add custom files to ~/.agency/knowledge/ontology.d/
-version: 1
+version: 2
 name: default
 description: General-purpose ontology for knowledge worker agents
-last_modified: "2026-03-24T17:00:00Z"
+last_modified: "2026-03-28T00:00:00Z"
 
 entity_types:
   # People and Organizations
@@ -181,6 +181,17 @@ entity_types:
     description: A web address for reference
     attributes: [url, description, type]
 
+  # Asset Inventory
+  software:
+    description: An application, library, package, or firmware installed on an asset. Use for anything with a name and version that runs on or is part of a device.
+    attributes: [name, version, vendor, install_date, install_path, hash]
+  config_item:
+    description: A configuration setting, parameter, or policy applied to an asset or service. Use for key-value configuration state worth tracking over time.
+    attributes: [key, value, asset, service, last_changed, changed_by]
+  behavior_pattern:
+    description: An observed behavioral pattern on an asset or between assets — a recurring sequence of actions, communications, or resource usage worth tracking. May be normal or anomalous.
+    attributes: [description, asset, first_seen, last_seen, frequency, anomaly_score, baseline]
+
 relationship_types:
   # Ownership and Authority
   owns:
@@ -267,7 +278,30 @@ relationship_types:
     description: Is scheduled for
     inverse: schedule_of
 
+  # Asset Inventory Relations
+  has_software:
+    description: Asset or system has software installed
+    inverse: installed_on
+  has_config:
+    description: Asset or service has a configuration item applied
+    inverse: config_of
+  exhibited:
+    description: Asset exhibited or displayed a behavior pattern
+    inverse: exhibited_by
+  similar_to:
+    description: Structurally or behaviorally similar to (used for pattern matching)
+    inverse: similar_to
+  preceded:
+    description: This pattern or event preceded another event or incident
+    inverse: preceded_by
+  communicates_with:
+    description: Asset communicates with another asset over the network
+    inverse: communicates_with
+
 changelog:
+  - version: 2
+    date: "2026-03-28"
+    changes: "Add asset inventory types: software, config_item, behavior_pattern; add relations: has_software, has_config, exhibited, similar_to, preceded, communicates_with"
   - version: 1
     date: "2026-03-24"
     changes: Initial default ontology
