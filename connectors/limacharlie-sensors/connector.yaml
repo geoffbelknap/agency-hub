@@ -3,14 +3,15 @@
 # knowledge graph.
 #
 # Software artifact collection is available via the get_sensor_artifacts
-# MCP tool on the main limacharlie connector — agents call it on demand
-# when investigating a specific device rather than bulk-polling all sensors.
+# MCP tool on the main limacharlie connector — agents call it on demand.
 #
 # Activate separately: agency connector activate limacharlie-sensors
+#
+# Auth: JWT exchange handled by egress proxy (jwt-swap.yaml config).
 
 kind: connector
 name: limacharlie-sensors
-version: 0.1.0
+version: 0.2.0
 description: >
   LimaCharlie sensor inventory connector. Polls sensor list every 15 minutes
   and writes Device nodes to the knowledge graph with current status, IP
@@ -21,16 +22,17 @@ license: MIT
 requires:
   credentials:
     - name: LC_API_KEY
-      description: LimaCharlie API key with sensors read scope
+      description: LimaCharlie API key (sensor.list scope)
     - name: LC_ORG_ID
       description: LimaCharlie organization ID
+  services:
+    - limacharlie-api
 
 source:
   type: poll
-  url: "https://api.limacharlie.io/v1/orgs/${LC_ORG_ID}/sensors"
+  url: "https://api.limacharlie.io/v1/sensors/${LC_ORG_ID}"
   method: GET
-  headers:
-    Authorization: "Bearer ${LC_API_KEY}"
+  # No Authorization header — egress JWT swap handles auth
   interval: 15m
   response_key: "$.sensors"
   dedup_key: "sid"
@@ -44,13 +46,13 @@ graph_ingest:
           internal_ip: "{{payload.int_ip}}"
           external_ip: "{{payload.ext_ip}}"
           platform: "{{payload.plat}}"
-          os_version: "{{payload.os_version}}"
           is_online: "{{payload.is_online}}"
-          last_seen: "{{payload.last_seen}}"
-          tags: "{{payload.tags}}"
+          last_seen: "{{payload.alive}}"
+          enrolled: "{{payload.enroll}}"
+          architecture: "{{payload.arch}}"
           source: "limacharlie"
 
-# No routes — sensor inventory is graph-only, no agent wake needed.
+# No routes — sensor inventory is graph-only.
 
 rate_limits:
   max_per_hour: 20

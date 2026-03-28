@@ -1,102 +1,109 @@
 # LimaCharlie Detections Connector
-# Polls LC detection API for security alerts. Writes Alert and Device nodes
-# to the knowledge graph. Routes high-severity alerts to the triage mission.
+# Polls LC Insight detection API for security alerts. Writes Alert and Device
+# nodes to the knowledge graph. Routes high-severity alerts to triage mission.
 #
 # Install:  agency hub install limacharlie --kind connector
 # Activate: agency connector activate limacharlie
 #
-# Credentials required:
+# Credentials:
 #   agency grant --global limacharlie-api --key-env LC_API_KEY
 #   Set LC_ORG_ID in ~/.agency/.env
+#
+# Auth: JWT exchange handled by egress proxy (jwt-swap.yaml config).
+# No Authorization header needed — egress injects Bearer JWT automatically.
 
 kind: connector
 name: limacharlie
-version: 0.1.0
+version: 0.2.0
 description: >
-  LimaCharlie endpoint security connector. Polls detections for security
-  alerts. Writes Alert and Device nodes to the knowledge graph. Routes
-  high-severity alerts to the triage mission.
+  LimaCharlie endpoint security connector. Polls the Insight detections
+  API for security alerts. Writes Alert and Device nodes to the knowledge
+  graph. Routes high and critical alerts to the triage mission.
 author: agency-hub
 license: MIT
 
 requires:
   credentials:
     - name: LC_API_KEY
-      description: LimaCharlie API key with detections read scope
+      description: LimaCharlie API key (insight.det.get, sensor.get scopes)
     - name: LC_ORG_ID
       description: LimaCharlie organization ID
+  services:
+    - limacharlie-api
 
 source:
   type: poll
-  url: "https://api.limacharlie.io/v1/orgs/${LC_ORG_ID}/detections"
+  url: "https://api.limacharlie.io/v1/insight/${LC_ORG_ID}/detections?start={_poll_start}&end={_poll_end}"
   method: GET
-  headers:
-    Authorization: "Bearer ${LC_API_KEY}"
+  # No Authorization header — egress JWT swap handles auth for api.limacharlie.io
   interval: 2m
-  response_key: "$.detections"
-  dedup_key: "id"
+  response_key: "$.detects"
+  dedup_key: "detect_id"
 
 # --- Knowledge graph writes ---
-# Only medium+ severity (3-5) written to graph. Info/low (1-2) discarded.
-# Templates use {{payload.field}} — graph_ingest renders in sandboxed Jinja2
-# with payload wrapped in a "payload" key.
+# Severity is in detect_mtd.level (string: info/low/medium/high/critical).
+# Only medium+ written to graph.
+# Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
 
 graph_ingest:
   - match:
-      severity: [3, 4, 5]
+      detect_mtd.level: [medium, high, critical]
     nodes:
       - kind: Alert
-        label: "{{payload.id}}"
+        label: "{{payload.detect_id}}"
         properties:
           category: "{{payload.cat}}"
-          severity: "{{payload.severity}}"
+          severity: "{{payload.detect_mtd.level}}"
+          description: "{{payload.detect_mtd.description}}"
           hostname: "{{payload.routing.hostname}}"
-          sensor_id: "{{payload.routing.sensor_id}}"
-          detected_at: "{{payload.detect_ts}}"
-          rule: "{{payload.detect.rule}}"
+          sensor_id: "{{payload.routing.sid}}"
+          detected_at: "{{payload.ts}}"
+          rule: "{{payload.source_rule}}"
+          mitre_tags: "{{payload.rule_tags}}"
           source: "limacharlie"
       - kind: Device
         label: "{{payload.routing.hostname}}"
         properties:
-          sensor_id: "{{payload.routing.sensor_id}}"
+          sensor_id: "{{payload.routing.sid}}"
           internal_ip: "{{payload.routing.int_ip}}"
           external_ip: "{{payload.routing.ext_ip}}"
           platform: "{{payload.routing.plat}}"
           source: "limacharlie"
     edges:
       - relation: REFERENCES
-        from_label: "{{payload.id}}"
+        from_label: "{{payload.detect_id}}"
         to_kind: Device
         to_label: "{{payload.routing.hostname}}"
 
 # --- Alert routing ---
-# Route templates use {{field}} directly — router.render_template unpacks
-# the payload dict as keyword args (no "payload." prefix).
+# Route match uses detect_mtd.level (string).
+# Route templates use {{field}} directly (router unpacks payload as kwargs).
 
 routes:
   - match:
-      severity: [4, 5]
+      detect_mtd.level: [high, critical]
     target:
       mission: alert-triage
     priority: high
     sla: 15m
 
   - match:
-      severity: [3]
+      detect_mtd.level: [medium]
     target:
       channel: security-findings
 
 # --- MCP tools for agents ---
-# Agents investigating alerts can call back into LC for detail.
+# Auth handled by egress JWT swap — tools hit api.limacharlie.io which
+# matches the jwt-swap.yaml domain config.
 
 mcp:
   name: limacharlie
   credential: limacharlie-api
-  api_base: "https://api.limacharlie.io/v1/orgs/${LC_ORG_ID}"
+  api_base: "https://api.limacharlie.io/v1"
   tools:
     - name: get_alert_detail
       method: GET
-      path: "/detections/{{alert_id}}"
+      path: "/insight/${LC_ORG_ID}/detections?detect_id={{alert_id}}"
       description: >
         Get full detail for a specific LC detection including raw event
         data, process tree context, and routing metadata.
@@ -104,26 +111,26 @@ mcp:
         alert_id:
           type: string
           required: true
-          description: LC detection ID (the 'id' field from detections)
+          description: LC detection ID (detect_id field from detections)
 
     - name: get_process_tree
       method: GET
-      path: "/sensors/{{sensor_id}}/processes"
+      path: "/sensors/${LC_ORG_ID}/{{sensor_id}}"
       description: >
-        Get the process tree for a sensor showing parent/child processes.
-        Useful for understanding alert context and lateral movement.
+        Get sensor details including recent activity. Use alongside
+        alert data to understand device context.
       parameters:
         sensor_id:
           type: string
           required: true
-          description: LC sensor ID from alert routing.sensor_id
+          description: LC sensor ID (routing.sid from detection)
 
     - name: get_sensor_artifacts
       method: GET
-      path: "/sensors/{{sensor_id}}/artifacts"
+      path: "/insight/${LC_ORG_ID}/artifacts?sid={{sensor_id}}&type={{artifact_type}}"
       description: >
-        Get installed software and running processes for a specific sensor.
-        Use for inventory queries about a device involved in an alert.
+        Get installed software, running processes, or file artifacts
+        for a specific sensor.
       parameters:
         sensor_id:
           type: string
