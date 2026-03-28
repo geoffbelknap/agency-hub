@@ -19,15 +19,10 @@ jobs:
     runs-on: ubuntu-latest
 
     # Do not run on PRs from forks — fork PRs cannot be auto-approved
-    # safely since the code hasn't been reviewed yet. Fork contributors
-    # must be added as collaborators or their PRs reviewed manually.
+    # safely since the code hasn't been reviewed yet.
     if: github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
-      # Pin all actions to full SHA — tag references (v6, v5) can be
-      # hijacked if the upstream repo is compromised. SHA pins are
-      # immutable. Audit these SHAs against the action's releases page
-      # if you need to update them.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
@@ -39,24 +34,29 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml
 
+      # Run review bot and capture exit code (0=auto-approve, 1=blocked, 2=needs-review)
       - name: Run review bot
         id: review
         env:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.sha }}
         run: |
-          # Validate BASE_REF is a safe branch name (alphanumeric, dash, slash, dot)
           if ! echo "$BASE_REF" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
-            echo "ERROR: invalid base_ref: $BASE_REF"
-            exit 1
+            echo "ERROR: invalid base_ref"
+            echo "exit_code=1" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          set +e
           python scripts/review_connector.py \
             --base "origin/$BASE_REF" \
             --head "$HEAD_SHA"
-        continue-on-error: true
+          EXIT_CODE=$?
+          set -e
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      - name: Handle auto-approve
-        if: steps.review.outcome == 'success'
+      # Exit 0: routine changes, auto-approve
+      - name: Auto-approve
+        if: steps.review.outputs.exit_code == '0'
         run: |
           gh pr review "$PR_NUMBER" --approve \
             --body "**Review Bot: AUTO-APPROVED**
@@ -73,23 +73,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Handle needs-review
-        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review == 'true'
+      # Exit 2: security surface changed, needs human review
+      - name: Flag for human review
+        if: steps.review.outputs.exit_code == '2'
         run: |
           gh pr comment "$PR_NUMBER" \
             --body "**Review Bot: NEEDS HUMAN REVIEW**
 
-          Security surface changes detected — a maintainer must review.
+          Security surface changes detected — review the workflow log
+          for details before merging.
 
-          See workflow log for details. @geoffbelknap please review."
+          @geoffbelknap"
 
           gh pr edit "$PR_NUMBER" --add-label "needs-human-review"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Handle validation failure
-        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
+      # Exit 1: validation failure, block merge
+      - name: Block on validation failure
+        if: steps.review.outputs.exit_code == '1'
         run: |
           gh pr comment "$PR_NUMBER" \
             --body "**Review Bot: BLOCKED**
@@ -100,11 +103,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      # Gate: fail only on validation errors (exit 1). Human-review (exit 2)
-      # passes the status check — branch protection's review requirement
-      # is the gate for those PRs, not the CI check.
-      - name: Gate — block merge on validation failure
-        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
-        run: |
-          echo "Connector validation failed. Fix errors before merge."
-          exit 1
+      # GATE: only validation failures (exit 1) block the status check.
+      # Human-review (exit 2) passes — the warning comment is informational.
+      # You reviewed the code before pushing; the bot confirms schema is valid.
+      - name: Status check gate
+        if: steps.review.outputs.exit_code == '1'
+        run: exit 1
