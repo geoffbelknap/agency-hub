@@ -103,43 +103,51 @@ mcp:
   tools:
     - name: get_alert_detail
       method: GET
-      path: "/insight/${LC_ORG_ID}/detections?detect_id={{alert_id}}"
+      path: "/insight/${LC_ORG_ID}/detections/{{detect_id}}"
       description: >
-        Get full detail for a specific LC detection including raw event
-        data, process tree context, and routing metadata.
+        Get full event detail for a specific LC detection. Returns the
+        raw event data including process info, file paths, hashes, and
+        command lines. Use after receiving an alert to get investigation
+        context.
       parameters:
-        alert_id:
+        detect_id:
           type: string
           required: true
-          description: LC detection ID (detect_id field from detections)
+          description: LC detection ID (detect_id field from alert)
 
-    - name: get_process_tree
+    - name: get_sensor_detail
       method: GET
-      path: "/sensors/${LC_ORG_ID}/{{sensor_id}}"
+      path: "/{{sensor_id}}"
       description: >
-        Get sensor details including recent activity. Use alongside
-        alert data to understand device context.
+        Get sensor info including hostname, IP addresses, platform,
+        enrollment date, and online status. Use to understand the
+        device involved in an alert.
       parameters:
         sensor_id:
           type: string
           required: true
-          description: LC sensor ID (routing.sid from detection)
+          description: LC sensor ID (routing.sid from alert)
 
-    - name: get_sensor_artifacts
+    - name: get_sensor_overview
       method: GET
-      path: "/insight/${LC_ORG_ID}/artifacts?sid={{sensor_id}}&type={{artifact_type}}"
+      path: "/insight/${LC_ORG_ID}/{{sensor_id}}/overview?start={{start}}&end={{end}}"
       description: >
-        Get installed software, running processes, or file artifacts
-        for a specific sensor.
+        Get sensor activity overview for a time window. Shows event
+        type distributions and activity summary. Requires start/end
+        unix timestamps.
       parameters:
         sensor_id:
           type: string
           required: true
           description: LC sensor ID
-        artifact_type:
+        start:
           type: string
-          required: false
-          description: "os_packages | processes | files (default: os_packages)"
+          required: true
+          description: Start time (unix seconds)
+        end:
+          type: string
+          required: true
+          description: End time (unix seconds)
 
 rate_limits:
   max_per_hour: 100
