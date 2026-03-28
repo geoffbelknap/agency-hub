@@ -42,8 +42,7 @@ source:
   type: poll
   url: "https://api.nextdns.io/profiles/${NEXTDNS_PROFILE_ID}/logs?status=blocked&from=-5m&limit=100"
   method: GET
-  headers:
-    X-Api-Key: "${NEXTDNS_API_KEY}"
+  # Auth handled by egress proxy — X-Api-Key injected via nextdns-api service credential
   interval: 5m
   response_key: "$.data"
   # No dedup_key — NextDNS log entries have no unique ID.

@@ -1,0 +1,16 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
+service: nextdns-api
+display_name: NextDNS API
+description: DNS analytics and security via NextDNS. Query logs, analytics, and configuration.
+api_base: https://api.nextdns.io
+credential:
+  env_var: NEXTDNS_API_KEY
+  header: X-Api-Key
+  scoped_prefix: agency-scoped-nextdns
+usage_example: |
+  curl -s -H "X-Agency-Service: nextdns-api" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://api.nextdns.io/profiles/{profile_id}/logs?status=blocked&from=-1h&limit=50"
+
+  Response is JSON with data[] containing domain, device, status, reasons.

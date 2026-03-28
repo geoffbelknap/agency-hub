@@ -38,8 +38,7 @@ source:
   type: poll
   url: "https://api.nextdns.io/profiles/${NEXTDNS_PROFILE_ID}/analytics/domains?from=-30m&limit=100"
   method: GET
-  headers:
-    X-Api-Key: "${NEXTDNS_API_KEY}"
+  # Auth handled by egress proxy — X-Api-Key injected via nextdns-api service credential
   interval: 30m
   response_key: "$.data"
 
