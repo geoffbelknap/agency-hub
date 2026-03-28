@@ -9,6 +9,7 @@ on:
       - 'ontology/**'
       - 'skills/**'
 
+# Minimal permissions — read content, write PR comments/reviews
 permissions:
   contents: read
   pull-requests: write
@@ -16,12 +17,22 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+
+    # Do not run on PRs from forks — fork PRs cannot be auto-approved
+    # safely since the code hasn't been reviewed yet. Fork contributors
+    # must be added as collaborators or their PRs reviewed manually.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
     steps:
-      - uses: actions/checkout@v6
+      # Pin all actions to full SHA — tag references (v6, v5) can be
+      # hijacked if the upstream repo is compromised. SHA pins are
+      # immutable. Audit these SHAs against the action's releases page
+      # if you need to update them.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.13'
 
@@ -30,10 +41,18 @@ jobs:
 
       - name: Run review bot
         id: review
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
+          # Validate BASE_REF is a safe branch name (alphanumeric, dash, slash, dot)
+          if ! echo "$BASE_REF" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
+            echo "ERROR: invalid base_ref: $BASE_REF"
+            exit 1
+          fi
           python scripts/review_connector.py \
-            --base origin/${{ github.base_ref }} \
-            --head ${{ github.sha }}
+            --base "origin/$BASE_REF" \
+            --head "$HEAD_SHA"
         continue-on-error: true
 
       - name: Handle auto-approve
