@@ -26,8 +26,26 @@ requires:
   credentials:
     - name: LC_API_KEY
       description: LimaCharlie API key (insight.det.get, sensor.get scopes)
+      type: secret
+      scope: service-grant
+      grant_name: limacharlie-api
+      setup_url: "https://app.limacharlie.io/api-keys"
     - name: LC_ORG_ID
       description: LimaCharlie organization ID
+      type: config
+      scope: env-var
+      example: "263c19e9-bd4a-475a-8cd3-5403af446cb9"
+  auth:
+    type: jwt-exchange
+    token_url: "https://jwt.limacharlie.io"
+    token_params:
+      oid: "${LC_ORG_ID}"
+      secret: "${credential}"
+    token_response_field: "jwt"
+    token_ttl_seconds: 3000
+  egress_domains:
+    - api.limacharlie.io
+    - jwt.limacharlie.io
   services:
     - limacharlie-api
 
