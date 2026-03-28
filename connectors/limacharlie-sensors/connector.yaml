@@ -23,8 +23,17 @@ requires:
   credentials:
     - name: LC_API_KEY
       description: LimaCharlie API key (sensor.list scope)
+      type: secret
+      scope: service-grant
+      grant_name: limacharlie-api
+      setup_url: "https://app.limacharlie.io/api-keys"
     - name: LC_ORG_ID
       description: LimaCharlie organization ID
+      type: config
+      scope: env-var
+      example: "263c19e9-bd4a-475a-8cd3-5403af446cb9"
+  egress_domains:
+    - api.limacharlie.io
   services:
     - limacharlie-api
 
