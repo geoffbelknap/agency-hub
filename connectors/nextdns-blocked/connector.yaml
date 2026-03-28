@@ -1,0 +1,151 @@
+# NextDNS Blocked DNS Queries Connector
+# Polls NextDNS logs API for blocked DNS queries only. Writes DNSQuery and
+# Device nodes to the knowledge graph. Routes threat-intelligence blocks
+# to the security-findings channel.
+#
+# Install:  agency hub install nextdns-blocked --kind connector
+# Activate: agency hub activate nextdns-blocked
+#
+# Credentials:
+#   agency grant --global nextdns-api --key-env NEXTDNS_API_KEY
+#   Set NEXTDNS_PROFILE_ID in ~/.agency/.env
+
+kind: connector
+name: nextdns-blocked
+version: 0.1.0
+description: >
+  NextDNS DNS firewall connector. Polls blocked DNS queries and writes
+  security-relevant DNS events to the knowledge graph. Routes
+  threat-intelligence blocked domains to the security findings channel.
+author: agency-hub
+license: MIT
+
+requires:
+  credentials:
+    - name: NEXTDNS_API_KEY
+      description: NextDNS API key (from account settings page)
+      type: secret
+      scope: service-grant
+      grant_name: nextdns-api
+      setup_url: "https://my.nextdns.io/account"
+    - name: NEXTDNS_PROFILE_ID
+      description: NextDNS profile ID (visible in dashboard URL)
+      type: config
+      scope: env-var
+      example: "abc123"
+  egress_domains:
+    - api.nextdns.io
+  services:
+    - nextdns-api
+
+source:
+  type: poll
+  url: "https://api.nextdns.io/profiles/${NEXTDNS_PROFILE_ID}/logs?status=blocked&from=-5m&limit=100"
+  method: GET
+  headers:
+    X-Api-Key: "${NEXTDNS_API_KEY}"
+  interval: 5m
+  response_key: "$.data"
+  # No dedup_key — NextDNS log entries have no unique ID.
+  # Hash-based change detection on the full response blob is used instead.
+
+# --- Knowledge graph writes ---
+# Only blocked queries reach this connector (filtered at API level via ?status=blocked).
+# Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
+# Device name is nested: payload.device.name (not flattened).
+
+graph_ingest:
+  - nodes:
+      - kind: DNSQuery
+        label: "{{payload.device.name}}:{{payload.domain}}"
+        properties:
+          domain: "{{payload.domain}}"
+          root_domain: "{{payload.root}}"
+          device_name: "{{payload.device.name}}"
+          device_id: "{{payload.device.id}}"
+          client_ip: "{{payload.clientIp}}"
+          status: "blocked"
+          protocol: "{{payload.protocol}}"
+          timestamp: "{{payload.timestamp}}"
+          block_reasons: "{{payload.reasons}}"
+          source: "nextdns"
+      - kind: Device
+        label: "{{payload.device.name}}"
+        properties:
+          device_id: "{{payload.device.id}}"
+          device_model: "{{payload.device.model}}"
+          source: "nextdns"
+    edges:
+      - relation: QUERIED
+        from_label: "{{payload.device.name}}"
+        from_kind: Device
+        to_label: "{{payload.device.name}}:{{payload.domain}}"
+        to_kind: DNSQuery
+
+# --- Threat-intelligence routing ---
+# Route blocked queries where the block reason includes threat intelligence
+# categories. The reasons field is an array of objects; str(value) is matched
+# by the router's regex engine, so the regex searches the string representation
+# of the entire array. This works because reason IDs contain the category name.
+#
+# Known limitation: if the router changes how it stringifies arrays, this
+# match may break. Document and monitor.
+
+routes:
+  - match:
+      reasons: "re:(threat|malware|phishing|cryptojacking|dga)"
+    target:
+      channel: security-findings
+    brief: |
+      NextDNS blocked threat domain: {{domain}}
+      Device: {{device.name}} ({{clientIp}})
+      Blocked by: {{reasons}}
+
+# --- MCP tools for agents ---
+
+mcp:
+  name: nextdns
+  credential: nextdns-api
+  api_base: "https://api.nextdns.io"
+  tools:
+    - name: get_dns_logs
+      method: GET
+      path: "/profiles/${NEXTDNS_PROFILE_ID}/logs?from={{from}}&status={{status}}&limit={{limit}}"
+      description: >
+        Query NextDNS DNS logs for a specific time window. Use for
+        investigation — not for bulk ingestion. Returns individual
+        log entries with device, domain, status, and block reasons.
+      parameters:
+        from:
+          type: string
+          required: false
+          description: "Time window start (e.g. -1h, -24h, -7d). Default: -1h"
+        status:
+          type: string
+          required: false
+          description: "Filter by status: blocked | allowed. Default: blocked"
+        limit:
+          type: integer
+          required: false
+          description: "Max results. Default: 50, max: 100"
+
+    - name: get_dns_analytics
+      method: GET
+      path: "/profiles/${NEXTDNS_PROFILE_ID}/analytics/domains?from={{from}}&limit={{limit}}"
+      description: >
+        Get aggregated DNS query analytics for a time window. Returns
+        top queried domains with query and block counts. Use to identify
+        high-frequency domains or establish behavioral baselines.
+      parameters:
+        from:
+          type: string
+          required: false
+          description: "Time window (e.g. -1h, -24h). Default: -24h"
+        limit:
+          type: integer
+          required: false
+          description: "Number of top domains. Default: 50, max: 100"
+
+rate_limits:
+  max_per_hour: 60
+  max_concurrent: 3
