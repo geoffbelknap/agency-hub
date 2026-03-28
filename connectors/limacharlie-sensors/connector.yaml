@@ -1,0 +1,57 @@
+# LimaCharlie Sensors Connector (companion to main limacharlie connector)
+# Polls sensor inventory for device tracking. Writes Device nodes to the
+# knowledge graph.
+#
+# Software artifact collection is available via the get_sensor_artifacts
+# MCP tool on the main limacharlie connector — agents call it on demand
+# when investigating a specific device rather than bulk-polling all sensors.
+#
+# Activate separately: agency connector activate limacharlie-sensors
+
+kind: connector
+name: limacharlie-sensors
+version: 0.1.0
+description: >
+  LimaCharlie sensor inventory connector. Polls sensor list every 15 minutes
+  and writes Device nodes to the knowledge graph with current status, IP
+  addresses, platform, and online state.
+author: agency-hub
+license: MIT
+
+requires:
+  credentials:
+    - name: LC_API_KEY
+      description: LimaCharlie API key with sensors read scope
+    - name: LC_ORG_ID
+      description: LimaCharlie organization ID
+
+source:
+  type: poll
+  url: "https://api.limacharlie.io/v1/orgs/${LC_ORG_ID}/sensors"
+  method: GET
+  headers:
+    Authorization: "Bearer ${LC_API_KEY}"
+  interval: 15m
+  response_key: "$.sensors"
+  dedup_key: "sid"
+
+graph_ingest:
+  - nodes:
+      - kind: Device
+        label: "{{payload.hostname}}"
+        properties:
+          sensor_id: "{{payload.sid}}"
+          internal_ip: "{{payload.int_ip}}"
+          external_ip: "{{payload.ext_ip}}"
+          platform: "{{payload.plat}}"
+          os_version: "{{payload.os_version}}"
+          is_online: "{{payload.is_online}}"
+          last_seen: "{{payload.last_seen}}"
+          tags: "{{payload.tags}}"
+          source: "limacharlie"
+
+# No routes — sensor inventory is graph-only, no agent wake needed.
+
+rate_limits:
+  max_per_hour: 20
+  max_concurrent: 2

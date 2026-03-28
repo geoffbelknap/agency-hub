@@ -1,0 +1,139 @@
+# LimaCharlie Detections Connector
+# Polls LC detection API for security alerts. Writes Alert and Device nodes
+# to the knowledge graph. Routes high-severity alerts to the triage mission.
+#
+# Install:  agency hub install limacharlie --kind connector
+# Activate: agency connector activate limacharlie
+#
+# Credentials required:
+#   agency grant --global limacharlie-api --key-env LC_API_KEY
+#   Set LC_ORG_ID in ~/.agency/.env
+
+kind: connector
+name: limacharlie
+version: 0.1.0
+description: >
+  LimaCharlie endpoint security connector. Polls detections for security
+  alerts. Writes Alert and Device nodes to the knowledge graph. Routes
+  high-severity alerts to the triage mission.
+author: agency-hub
+license: MIT
+
+requires:
+  credentials:
+    - name: LC_API_KEY
+      description: LimaCharlie API key with detections read scope
+    - name: LC_ORG_ID
+      description: LimaCharlie organization ID
+
+source:
+  type: poll
+  url: "https://api.limacharlie.io/v1/orgs/${LC_ORG_ID}/detections"
+  method: GET
+  headers:
+    Authorization: "Bearer ${LC_API_KEY}"
+  interval: 2m
+  response_key: "$.detections"
+  dedup_key: "id"
+
+# --- Knowledge graph writes ---
+# Only medium+ severity (3-5) written to graph. Info/low (1-2) discarded.
+# Templates use {{payload.field}} — graph_ingest renders in sandboxed Jinja2
+# with payload wrapped in a "payload" key.
+
+graph_ingest:
+  - match:
+      severity: [3, 4, 5]
+    nodes:
+      - kind: Alert
+        label: "{{payload.id}}"
+        properties:
+          category: "{{payload.cat}}"
+          severity: "{{payload.severity}}"
+          hostname: "{{payload.routing.hostname}}"
+          sensor_id: "{{payload.routing.sensor_id}}"
+          detected_at: "{{payload.detect_ts}}"
+          rule: "{{payload.detect.rule}}"
+          source: "limacharlie"
+      - kind: Device
+        label: "{{payload.routing.hostname}}"
+        properties:
+          sensor_id: "{{payload.routing.sensor_id}}"
+          internal_ip: "{{payload.routing.int_ip}}"
+          external_ip: "{{payload.routing.ext_ip}}"
+          platform: "{{payload.routing.plat}}"
+          source: "limacharlie"
+    edges:
+      - relation: REFERENCES
+        from_label: "{{payload.id}}"
+        to_kind: Device
+        to_label: "{{payload.routing.hostname}}"
+
+# --- Alert routing ---
+# Route templates use {{field}} directly — router.render_template unpacks
+# the payload dict as keyword args (no "payload." prefix).
+
+routes:
+  - match:
+      severity: [4, 5]
+    target:
+      mission: alert-triage
+    priority: high
+    sla: 15m
+
+  - match:
+      severity: [3]
+    target:
+      channel: security-findings
+
+# --- MCP tools for agents ---
+# Agents investigating alerts can call back into LC for detail.
+
+mcp:
+  name: limacharlie
+  credential: limacharlie-api
+  api_base: "https://api.limacharlie.io/v1/orgs/${LC_ORG_ID}"
+  tools:
+    - name: get_alert_detail
+      method: GET
+      path: "/detections/{{alert_id}}"
+      description: >
+        Get full detail for a specific LC detection including raw event
+        data, process tree context, and routing metadata.
+      parameters:
+        alert_id:
+          type: string
+          required: true
+          description: LC detection ID (the 'id' field from detections)
+
+    - name: get_process_tree
+      method: GET
+      path: "/sensors/{{sensor_id}}/processes"
+      description: >
+        Get the process tree for a sensor showing parent/child processes.
+        Useful for understanding alert context and lateral movement.
+      parameters:
+        sensor_id:
+          type: string
+          required: true
+          description: LC sensor ID from alert routing.sensor_id
+
+    - name: get_sensor_artifacts
+      method: GET
+      path: "/sensors/{{sensor_id}}/artifacts"
+      description: >
+        Get installed software and running processes for a specific sensor.
+        Use for inventory queries about a device involved in an alert.
+      parameters:
+        sensor_id:
+          type: string
+          required: true
+          description: LC sensor ID
+        artifact_type:
+          type: string
+          required: false
+          description: "os_packages | processes | files (default: os_packages)"
+
+rate_limits:
+  max_per_hour: 100
+  max_concurrent: 5
