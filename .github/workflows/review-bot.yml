@@ -100,6 +100,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Fail on validation errors
+      # Gate: fail only on validation errors (exit 1). Human-review (exit 2)
+      # passes the status check — branch protection's review requirement
+      # is the gate for those PRs, not the CI check.
+      - name: Gate — block merge on validation failure
         if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
-        run: exit 1
+        run: |
+          echo "Connector validation failed. Fix errors before merge."
+          exit 1
