@@ -1,0 +1,86 @@
+name: Connector Review Bot
+
+on:
+  pull_request:
+    paths:
+      - 'connectors/**'
+      - 'packs/**'
+      - 'presets/**'
+      - 'ontology/**'
+      - 'skills/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Run review bot
+        id: review
+        run: |
+          python scripts/review_connector.py \
+            --base origin/${{ github.base_ref }} \
+            --head ${{ github.sha }}
+        continue-on-error: true
+
+      - name: Handle auto-approve
+        if: steps.review.outcome == 'success'
+        run: |
+          gh pr review "$PR_NUMBER" --approve \
+            --body "**Review Bot: AUTO-APPROVED**
+
+          All changes are routine — no security surface changes detected.
+
+          Checks passed:
+          - Schema validation
+          - Credential scope unchanged
+          - Egress domains unchanged
+          - MCP tools unchanged
+          - Template safety scan"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Handle needs-review
+        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review == 'true'
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --body "**Review Bot: NEEDS HUMAN REVIEW**
+
+          Security surface changes detected — a maintainer must review.
+
+          See workflow log for details. @geoffbelknap please review."
+
+          gh pr edit "$PR_NUMBER" --add-label "needs-human-review"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Handle validation failure
+        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --body "**Review Bot: BLOCKED**
+
+          Connector validation failed. Fix the errors and push again.
+          See the workflow log for details."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Fail on validation errors
+        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
+        run: exit 1

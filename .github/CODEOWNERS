@@ -1,0 +1,9 @@
+# Hub component reviewers — PRs flagged by review bot are assigned here.
+# The review bot auto-approves routine changes. Security surface changes
+# (new credentials, egress domains, MCP tools) require human review.
+
+# All components default to platform owner
+* @geoffbelknap
+
+# Packs always require human review (capability grants, mission defs)
+packs/ @geoffbelknap
