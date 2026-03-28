@@ -100,6 +100,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Fail on validation errors
-        if: steps.review.outcome == 'failure' && steps.review.outputs.needs_review != 'true'
-        run: exit 1
+      # Gate: fail the job (and thus the required status check) if the
+      # review bot didn't auto-approve. This blocks merge until either:
+      #   - The connector is updated to pass auto-approve, OR
+      #   - A human approves the PR (satisfying the review requirement)
+      - name: Gate — block merge unless auto-approved
+        if: steps.review.outcome != 'success'
+        run: |
+          echo "Review bot did not auto-approve. Merge blocked until human review."
+          exit 1
