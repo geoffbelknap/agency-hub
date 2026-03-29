@@ -1,0 +1,49 @@
+name: Stamp Metadata
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'connectors/**'
+      - 'packs/**'
+      - 'presets/**'
+      - 'ontology/**'
+      - 'skills/**'
+
+permissions:
+  contents: write
+
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Stamp metadata
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: python scripts/stamp_metadata.py --ref "$COMMIT_SHA"
+
+      - name: Commit and push
+        env:
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          git config user.name "agency-hub-bot"
+          git config user.email "agency-hub-bot@users.noreply.github.com"
+          git add -A '*/metadata.yaml'
+          if git diff --cached --quiet; then
+            echo "No metadata changes to commit."
+          else
+            git commit -m "chore: stamp metadata for ${SHORT_SHA:0:7}"
+            git push
+          fi
