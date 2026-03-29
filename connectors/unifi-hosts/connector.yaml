@@ -1,0 +1,70 @@
+# UniFi Host/Console Inventory Connector
+# Polls Site Manager API for UniFi consoles (UCG Max, UDM, UCK etc).
+# Writes Device nodes (device_type=console) to the knowledge graph.
+# Graph-only — no routes.
+#
+# Install:  agency hub install unifi-hosts --kind connector
+# Activate: agency hub activate unifi-hosts
+#
+# Credentials:
+#   agency grant --global unifi-api --key-env UNIFI_API_KEY
+
+kind: connector
+name: unifi-hosts
+version: 0.1.0
+description: >
+  UniFi host/console inventory connector. Polls the Site Manager API for
+  UniFi controllers (UCG Max, UDM, UCK G2, etc). Writes Device nodes with
+  connection state and firmware version. Read-only, graph-only.
+author: agency-hub
+license: MIT
+
+requires:
+  credentials:
+    - name: UNIFI_API_KEY
+      description: UniFi Site Manager API key (generate at unifi.ui.com -> API)
+      type: secret
+      scope: service-grant
+      grant_name: unifi-api
+      setup_url: "https://unifi.ui.com"
+  egress_domains:
+    - api.ui.com
+  services:
+    - unifi-api
+
+source:
+  type: poll
+  url: "https://api.ui.com/v1/hosts"
+  method: GET
+  # Auth handled by egress proxy — X-API-Key injected via unifi-api service credential
+  interval: 30m
+  response_key: "$.data"
+
+
+# --- Knowledge graph writes ---
+# Each payload item is a host object with reportedState and userData.
+# Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
+# Nested field access: {{payload.reportedState.hostname}}
+# Missing nested fields render as empty string — use 'or' fallback.
+
+graph_ingest:
+  - nodes:
+      - kind: Device
+        label: "{{payload.reportedState.hostname or payload.id}}"
+        properties:
+          host_id: "{{payload.id}}"
+          hardware_id: "{{payload.hardwareId}}"
+          ip_address: "{{payload.ipAddress}}"
+          host_type: "{{payload.type}}"
+          firmware_version: "{{payload.reportedState.firmwareVersion}}"
+          uptime_seconds: "{{payload.reportedState.uptime}}"
+          last_connection_change: "{{payload.lastConnectionStateChange}}"
+          registration_time: "{{payload.registrationTime}}"
+          source: "unifi"
+          device_type: "console"
+
+# No routes — graph-only connector.
+
+rate_limits:
+  max_per_hour: 20
+  max_concurrent: 2

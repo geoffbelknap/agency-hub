@@ -1,0 +1,98 @@
+# UniFi Infrastructure Devices Connector
+# Polls Site Manager API for infrastructure devices (APs, switches, gateways).
+# Writes Device nodes to the knowledge graph. Graph-only — no routes.
+#
+# Install:  agency hub install unifi --kind connector
+# Activate: agency hub activate unifi
+#
+# Credentials:
+#   agency grant --global unifi-api --key-env UNIFI_API_KEY
+#
+# Note: The /v1/devices response nests devices inside host-wrapper objects:
+#   { "data": [ { "hostId": "...", "devices": [...] } ] }
+# response_key $.data yields host-wrapper objects, not individual devices.
+# Each graph_ingest payload is a host-device-group. Individual device
+# enumeration is available via the get_unifi_devices MCP tool.
+
+kind: connector
+name: unifi
+version: 0.1.0
+description: >
+  UniFi network infrastructure connector. Polls the Site Manager API for
+  infrastructure devices (access points, switches, gateways) grouped by
+  host. Writes Device nodes to the knowledge graph. Read-only, graph-only.
+author: agency-hub
+license: MIT
+
+requires:
+  credentials:
+    - name: UNIFI_API_KEY
+      description: UniFi Site Manager API key (generate at unifi.ui.com -> API)
+      type: secret
+      scope: service-grant
+      grant_name: unifi-api
+      setup_url: "https://unifi.ui.com"
+  egress_domains:
+    - api.ui.com
+  services:
+    - unifi-api
+
+source:
+  type: poll
+  url: "https://api.ui.com/v1/devices"
+  method: GET
+  # Auth handled by egress proxy — X-API-Key injected via unifi-api service credential
+  interval: 15m
+  response_key: "$.data"
+  # No dedup_key — device state changes continuously (status, firmware).
+
+# --- Knowledge graph writes ---
+# Each payload item is a host-device-group (hostId, hostName, devices[]).
+# We create a summary Device node per host-group with aggregate info.
+# Individual device properties are accessible via MCP tools.
+# Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
+
+graph_ingest:
+  - nodes:
+      - kind: Device
+        label: "{{payload.hostName or payload.hostId}}"
+        properties:
+          host_id: "{{payload.hostId}}"
+          host_name: "{{payload.hostName}}"
+          updated_at: "{{payload.updatedAt}}"
+          source: "unifi"
+          device_type: "device_group"
+
+# No routes — graph-only connector.
+
+# --- MCP tools for agents ---
+
+mcp:
+  name: unifi
+  credential: unifi-api
+  api_base: "https://api.ui.com"
+  tools:
+    - name: get_unifi_hosts
+      method: GET
+      path: "/v1/hosts"
+      description: >
+        Get list of all UniFi consoles (UCG, UDM, UCK etc) associated with
+        the account, including connection state and firmware version.
+      parameters: {}
+
+    - name: get_unifi_devices
+      method: GET
+      path: "/v1/devices"
+      description: >
+        Get all UniFi network infrastructure devices (APs, switches,
+        gateways) with status and firmware info. Optionally filter by host.
+        Returns devices grouped by host controller.
+      parameters:
+        host_id:
+          type: string
+          required: false
+          description: Filter to devices managed by a specific host ID (optional)
+
+rate_limits:
+  max_per_hour: 30
+  max_concurrent: 2

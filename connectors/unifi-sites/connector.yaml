@@ -1,0 +1,76 @@
+# UniFi Site Topology Connector
+# Polls Site Manager API for sites (logical network segments).
+# Writes NetworkSegment nodes to the knowledge graph.
+# Graph-only — no routes.
+#
+# Install:  agency hub install unifi-sites --kind connector
+# Activate: agency hub activate unifi-sites
+#
+# Credentials:
+#   agency grant --global unifi-api --key-env UNIFI_API_KEY
+
+kind: connector
+name: unifi-sites
+version: 0.1.0
+description: >
+  UniFi site topology connector. Polls the Site Manager API for sites
+  (logical network segments). Writes NetworkSegment nodes with device
+  counts and topology metadata. Read-only, graph-only.
+author: agency-hub
+license: MIT
+
+requires:
+  credentials:
+    - name: UNIFI_API_KEY
+      description: UniFi Site Manager API key (generate at unifi.ui.com -> API)
+      type: secret
+      scope: service-grant
+      grant_name: unifi-api
+      setup_url: "https://unifi.ui.com"
+  egress_domains:
+    - api.ui.com
+  services:
+    - unifi-api
+
+source:
+  type: poll
+  url: "https://api.ui.com/v1/sites"
+  method: GET
+  # Auth handled by egress proxy — X-API-Key injected via unifi-api service credential
+  interval: 30m
+  response_key: "$.data"
+
+# --- Knowledge graph writes ---
+# Each payload item is a site object with meta and statistics.
+# Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
+
+graph_ingest:
+  - nodes:
+      - kind: network_segment
+        label: "{{payload.meta.desc or payload.meta.name}}"
+        properties:
+          site_id: "{{payload.siteId}}"
+          host_id: "{{payload.hostId}}"
+          description: "{{payload.meta.desc}}"
+          name: "{{payload.meta.name}}"
+          gateway_mac: "{{payload.meta.gatewayMac}}"
+          timezone: "{{payload.meta.timezone}}"
+          device_count: "{{payload.statistics.counts.device}}"
+          client_count: "{{payload.statistics.counts.user}}"
+          guest_count: "{{payload.statistics.counts.guest}}"
+          iot_count: "{{payload.statistics.counts.iot}}"
+          wlan_count: "{{payload.statistics.counts.wlan}}"
+          permission: "{{payload.permission}}"
+          source: "unifi"
+    edges:
+      - relation: ON_SEGMENT
+        from_kind: Device
+        from_label: "{{payload.hostId}}"
+        to_kind: network_segment
+        to_label: "{{payload.meta.desc or payload.meta.name}}"
+
+# No routes — graph-only connector.
+
+rate_limits:
+  max_per_hour: 20
+  max_concurrent: 2

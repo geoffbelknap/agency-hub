@@ -1,0 +1,16 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
+service: unifi-api
+display_name: UniFi Site Manager API
+description: UniFi network infrastructure management via Ubiquiti Site Manager API. Query hosts, devices, and sites.
+api_base: https://api.ui.com
+credential:
+  env_var: UNIFI_API_KEY
+  header: X-API-Key
+  scoped_prefix: agency-scoped-unifi
+usage_example: |
+  curl -s -H "X-Agency-Service: unifi-api" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://api.ui.com/v1/hosts"
+
+  Response is JSON with data[] containing host objects with reportedState, userData.
