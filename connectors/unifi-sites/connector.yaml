@@ -11,7 +11,7 @@
 
 kind: connector
 name: unifi-sites
-version: 0.1.0
+version: 0.2.0
 description: >
   UniFi site topology connector. Polls the Site Manager API for sites
   (logical network segments). Writes NetworkSegment nodes with device
@@ -45,7 +45,11 @@ source:
 # Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
 
 graph_ingest:
-  - nodes:
+  - correlate:
+      source: unifi           # look up recent payloads from the unifi connector
+      on: hostId              # match hostId across both connectors
+      window_seconds: 3600    # within the last hour
+    nodes:
       - kind: network_segment
         label: "{{payload.meta.desc or payload.meta.name}}"
         properties:
@@ -65,7 +69,8 @@ graph_ingest:
     edges:
       - relation: ON_SEGMENT
         from_kind: Device
-        from_label: "{{payload.hostId}}"
+        # Resolve hostId to hostName via cross-connector correlation
+        from_label: "{{correlated.hostName or payload.hostId}}"
         to_kind: network_segment
         to_label: "{{payload.meta.desc or payload.meta.name}}"
 
