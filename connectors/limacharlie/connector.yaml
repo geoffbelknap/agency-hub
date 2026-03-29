@@ -14,7 +14,7 @@
 
 kind: connector
 name: limacharlie
-version: 0.2.0
+version: 0.3.0
 description: >
   LimaCharlie endpoint security connector. Polls the Insight detections
   API for security alerts. Writes Alert and Device nodes to the knowledge
@@ -73,25 +73,25 @@ graph_ingest:
           category: "{{payload.cat}}"
           severity: "{{payload.detect_mtd.level}}"
           description: "{{payload.detect_mtd.description}}"
-          hostname: "{{payload.routing.hostname}}"
-          sensor_id: "{{payload.routing.sid}}"
+          hostname: "{{payload.detect.routing.hostname}}"
+          sensor_id: "{{payload.detect.routing.sid}}"
           detected_at: "{{payload.ts}}"
           rule: "{{payload.source_rule}}"
           mitre_tags: "{{payload.rule_tags}}"
           source: "limacharlie"
       - kind: Device
-        label: "{{payload.routing.hostname}}"
+        label: "{{payload.detect.routing.hostname}}"
         properties:
-          sensor_id: "{{payload.routing.sid}}"
-          internal_ip: "{{payload.routing.int_ip}}"
-          external_ip: "{{payload.routing.ext_ip}}"
-          platform: "{{payload.routing.plat}}"
+          sensor_id: "{{payload.detect.routing.sid}}"
+          internal_ip: "{{payload.detect.routing.int_ip}}"
+          external_ip: "{{payload.detect.routing.ext_ip}}"
+          platform: "{{payload.detect.routing.plat}}"
           source: "limacharlie"
     edges:
       - relation: REFERENCES
         from_label: "{{payload.detect_id}}"
         to_kind: Device
-        to_label: "{{payload.routing.hostname}}"
+        to_label: "{{payload.detect.routing.hostname}}"
 
 # --- Alert routing ---
 # Route match uses detect_mtd.level (string).
