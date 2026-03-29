@@ -1,0 +1,32 @@
+kind: pack
+name: security-ops
+version: "0.1.0"
+description: >
+  Phase 1 security operations. Alert triage and environment exploration.
+  Observe-and-report only — no autonomous decisions or escalation chains.
+author: geoffbelknap
+
+team:
+  name: security-ops
+
+  agents:
+    - name: alert-triage
+      preset: security-triage
+      role: standard
+
+    - name: security-explorer
+      preset: security-explorer
+      role: standard
+
+  channels:
+    - name: security-findings
+      topic: "Security findings, alerts, and observations"
+
+recommended_connectors:
+  - limacharlie
+  - limacharlie-sensors
+  - nextdns-blocked
+  - nextdns-analytics
+  - unifi
+  - unifi-hosts
+  - unifi-sites
