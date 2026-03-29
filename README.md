@@ -37,12 +37,31 @@ hub:
       branch: main
 ```
 
-Then:
+## Hub CLI Commands
 
 ```bash
-agency hub update          # sync hub cache
-agency hub search          # browse available components
-agency hub install <name>  # install a component + dependencies
+# Cache management
+agency hub update                         # refresh hub sources (git pull, no writes to ~/.agency/)
+agency hub outdated                       # show available upgrades from cache
+agency hub upgrade [component...]         # apply upgrades (managed files + components)
+
+# Discovery
+agency hub search <query>                 # search available components
+agency hub list                           # list available and installed components
+agency hub info <name>                    # show component details
+
+# Install / remove
+agency hub install <name> --kind <kind>   # install a component
+agency hub remove <name>                  # remove installed component
+
+# Instance management
+agency hub instances                      # list installed instances
+agency hub show <nameOrID>                # show instance detail
+agency hub activate <nameOrID>            # activate; use --set KEY=VALUE for credentials
+agency hub deactivate <nameOrID>          # deactivate
+
+# Packs
+agency hub deploy <pack.yaml>             # deploy a pack
 ```
 
 ## Available Packs
@@ -91,6 +110,19 @@ agency hub install jira-ops
 
 ---
 
+### `security-ops`
+
+Phase 1 security operations pack. Observe-and-report only — no remediation actions. Ships two agents:
+
+- **alert-triage** (Haiku) — assesses incoming alerts from security connectors, classifies severity, and posts findings.
+- **security-explorer** (Sonnet) — scheduled environment enrichment; queries connected security tools and builds context in the knowledge graph.
+
+```bash
+agency hub install security-ops
+```
+
+---
+
 ### `red-team`
 
 Red team coordination pack for **authorized** security testing. A coordinator
@@ -126,6 +158,13 @@ independently with any agent team.
 | `jira-ops` | poll | Poll a Jira project for new/updated issues |
 | `comms-to-slack` | channel-watch | Mirror agency comms channel to a Slack channel |
 | `red-team-escalations-to-slack` | channel-watch | Surface red-team escalations in Slack |
+| `limacharlie` | poll | Poll LC Insight detections API; routes high/critical detections to triage mission |
+| `limacharlie-sensors` | poll | Poll LC sensor inventory; graph-only |
+| `nextdns-blocked` | poll | Poll blocked DNS queries; graph-only + threat-intel routing |
+| `nextdns-analytics` | poll | Poll domain analytics; graph-only |
+| `unifi` | poll | Poll UniFi infrastructure devices; graph-only |
+| `unifi-hosts` | poll | Poll UniFi console inventory; graph-only |
+| `unifi-sites` | poll | Poll UniFi site topology; graph-only |
 
 ```bash
 agency hub install slack-events
@@ -142,3 +181,36 @@ https://<your-host>/webhooks/slack-events
 ```
 
 The intake handles the Slack URL verification challenge automatically.
+
+## Presets
+
+Presets are agent configuration templates installed to `~/.agency/registry/presets/`. Install via `agency hub install <name> --kind preset`.
+
+| Name | Description |
+|------|-------------|
+| `security-triage` | Fast tier, autonomous alert assessment. Used by the `alert-triage` agent in `security-ops`. |
+| `security-explorer` | Standard tier, scheduled environment enrichment. Used by the `security-explorer` agent in `security-ops`. |
+
+## Services
+
+Service definitions declare the external APIs that connectors and agents depend on. Installed to `~/.agency/registry/services/` by `agency hub update`.
+
+| Name | API domain |
+|------|-----------|
+| `brave-search` | `api.search.brave.com` |
+| `github` | `api.github.com` |
+| `jira` | `*.atlassian.net` |
+| `limacharlie-api` | `api.limacharlie.io` |
+| `nextdns-api` | `api.nextdns.io` |
+| `slack` | `slack.com` |
+| `unifi-api` | `unifi.ui.com` |
+
+## CI
+
+### Review bot
+
+Validates connector PRs on every push. Auto-approves routine changes (doc edits, pricing updates, patch bumps). Flags changes that expand security surface — new egress domains, new credential types, new syscall allowances — for human review before merge.
+
+### Stamp metadata
+
+On merge to `main`, a workflow stamps `metadata.yaml` with the build hash and opens a PR with auto-merge enabled. This ensures every release has a traceable content hash for staleness detection.
