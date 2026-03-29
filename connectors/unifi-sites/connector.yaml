@@ -11,7 +11,7 @@
 
 kind: connector
 name: unifi-sites
-version: 0.1.0
+version: 0.2.0
 description: >
   UniFi site topology connector. Polls the Site Manager API for sites
   (logical network segments). Writes NetworkSegment nodes with device
@@ -62,6 +62,15 @@ graph_ingest:
           wlan_count: "{{payload.statistics.counts.wlan}}"
           permission: "{{payload.permission}}"
           source: "unifi"
+      # Upsert a Device node for the host so the edge resolves
+      # (the unifi connector may create this with hostName, but the sites
+      # API only has hostId — upsert ensures the node exists either way)
+      - kind: Device
+        label: "{{payload.hostId}}"
+        properties:
+          host_id: "{{payload.hostId}}"
+          source: "unifi"
+          device_type: "console"
     edges:
       - relation: ON_SEGMENT
         from_kind: Device
