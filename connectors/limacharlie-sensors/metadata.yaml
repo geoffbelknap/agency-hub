@@ -1,6 +1,6 @@
-name: slack-ops
+name: limacharlie-sensors
 kind: connector
-version: 1.1.0
+version: 0.2.0
 build: 68528b1
 published_at: '2026-03-29T22:49:10.712707+00:00'
 reviewed_by: bot

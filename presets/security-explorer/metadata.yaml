@@ -1,6 +1,6 @@
-name: slack-ops
-kind: connector
-version: 1.1.0
+name: security-explorer
+kind: unknown
+version: 0.0.0
 build: 68528b1
 published_at: '2026-03-29T22:49:10.712707+00:00'
 reviewed_by: bot
