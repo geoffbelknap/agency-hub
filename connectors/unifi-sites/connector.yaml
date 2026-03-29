@@ -45,7 +45,11 @@ source:
 # Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
 
 graph_ingest:
-  - nodes:
+  - correlate:
+      source: unifi           # look up recent payloads from the unifi connector
+      on: hostId              # match hostId across both connectors
+      window_seconds: 3600    # within the last hour
+    nodes:
       - kind: network_segment
         label: "{{payload.meta.desc or payload.meta.name}}"
         properties:
@@ -62,19 +66,11 @@ graph_ingest:
           wlan_count: "{{payload.statistics.counts.wlan}}"
           permission: "{{payload.permission}}"
           source: "unifi"
-      # Upsert a Device node for the host so the edge resolves
-      # (the unifi connector may create this with hostName, but the sites
-      # API only has hostId — upsert ensures the node exists either way)
-      - kind: Device
-        label: "{{payload.hostId}}"
-        properties:
-          host_id: "{{payload.hostId}}"
-          source: "unifi"
-          device_type: "console"
     edges:
       - relation: ON_SEGMENT
         from_kind: Device
-        from_label: "{{payload.hostId}}"
+        # Resolve hostId to hostName via cross-connector correlation
+        from_label: "{{correlated.hostName or payload.hostId}}"
         to_kind: network_segment
         to_label: "{{payload.meta.desc or payload.meta.name}}"
 
