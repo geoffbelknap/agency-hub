@@ -2,12 +2,6 @@ name: Connector Review Bot
 
 on:
   pull_request:
-    paths:
-      - 'connectors/**'
-      - 'packs/**'
-      - 'presets/**'
-      - 'ontology/**'
-      - 'skills/**'
 
 # Minimal permissions — read content, write PR comments/reviews
 permissions:
@@ -27,15 +21,38 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Skip review for PRs that don't touch component files.
+      # Always report a status so the required check passes.
+      - name: Check for component changes
+        id: changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if ! echo "$BASE_REF" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
+            echo "has_components=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "origin/$BASE_REF"...HEAD -- \
+            'connectors/' 'packs/' 'presets/' 'ontology/' 'skills/' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "has_components=false" >> "$GITHUB_OUTPUT"
+            echo "No component changes — skipping review."
+          else
+            echo "has_components=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: steps.changes.outputs.has_components == 'true'
         with:
           python-version: '3.13'
 
       - name: Install dependencies
+        if: steps.changes.outputs.has_components == 'true'
         run: pip install pyyaml
 
       # Run review bot and capture exit code (0=auto-approve, 1=blocked, 2=needs-review)
       - name: Run review bot
+        if: steps.changes.outputs.has_components == 'true'
         id: review
         env:
           BASE_REF: ${{ github.base_ref }}
