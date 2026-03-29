@@ -12,7 +12,7 @@
 
 kind: connector
 name: nextdns-blocked
-version: 0.1.0
+version: 0.2.0
 description: >
   NextDNS DNS firewall connector. Polls blocked DNS queries and writes
   security-relevant DNS events to the knowledge graph. Routes
@@ -51,35 +51,33 @@ source:
 # --- Knowledge graph writes ---
 # Only blocked queries reach this connector (filtered at API level via ?status=blocked).
 # Templates use {{payload.field}} — graph_ingest sandboxed Jinja2.
-# Device name is nested: payload.device.name (not flattened).
+# Note: NextDNS logs API does not include device info — clientIp is the only
+# client identifier available in the blocked logs response.
 
 graph_ingest:
   - nodes:
       - kind: DNSQuery
-        label: "{{payload.device.name or payload.clientIp}}:{{payload.domain}}"
+        label: "{{payload.clientIp}}:{{payload.domain}}"
         properties:
           domain: "{{payload.domain}}"
           root_domain: "{{payload.root}}"
-          device_name: "{{payload.device.name or payload.clientIp}}"
-          device_id: "{{payload.device.id}}"
           client_ip: "{{payload.clientIp}}"
           status: "blocked"
           protocol: "{{payload.protocol}}"
           timestamp: "{{payload.timestamp}}"
           block_reasons: "{{payload.reasons}}"
+          tracker: "{{payload.tracker}}"
           source: "nextdns"
-      - kind: Device
-        label: "{{payload.device.name or payload.clientIp}}"
+      - kind: network_endpoint
+        label: "{{payload.clientIp}}"
         properties:
-          device_id: "{{payload.device.id}}"
-          device_model: "{{payload.device.model}}"
           client_ip: "{{payload.clientIp}}"
           source: "nextdns"
     edges:
       - relation: QUERIED
-        from_label: "{{payload.device.name or payload.clientIp}}"
-        from_kind: Device
-        to_label: "{{payload.device.name or payload.clientIp}}:{{payload.domain}}"
+        from_label: "{{payload.clientIp}}"
+        from_kind: network_endpoint
+        to_label: "{{payload.clientIp}}:{{payload.domain}}"
         to_kind: DNSQuery
 
 # --- Threat-intelligence routing ---
@@ -98,7 +96,7 @@ routes:
       channel: security-findings
     brief: |
       NextDNS blocked threat domain: {{domain}}
-      Device: {{device.name}} ({{clientIp}})
+      Client: {{clientIp}}
       Blocked by: {{reasons}}
 
 # --- MCP tools for agents ---
