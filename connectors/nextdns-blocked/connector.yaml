@@ -56,11 +56,11 @@ source:
 graph_ingest:
   - nodes:
       - kind: DNSQuery
-        label: "{{payload.device.name}}:{{payload.domain}}"
+        label: "{{payload.device.name or payload.clientIp}}:{{payload.domain}}"
         properties:
           domain: "{{payload.domain}}"
           root_domain: "{{payload.root}}"
-          device_name: "{{payload.device.name}}"
+          device_name: "{{payload.device.name or payload.clientIp}}"
           device_id: "{{payload.device.id}}"
           client_ip: "{{payload.clientIp}}"
           status: "blocked"
@@ -69,16 +69,17 @@ graph_ingest:
           block_reasons: "{{payload.reasons}}"
           source: "nextdns"
       - kind: Device
-        label: "{{payload.device.name}}"
+        label: "{{payload.device.name or payload.clientIp}}"
         properties:
           device_id: "{{payload.device.id}}"
           device_model: "{{payload.device.model}}"
+          client_ip: "{{payload.clientIp}}"
           source: "nextdns"
     edges:
       - relation: QUERIED
-        from_label: "{{payload.device.name}}"
+        from_label: "{{payload.device.name or payload.clientIp}}"
         from_kind: Device
-        to_label: "{{payload.device.name}}:{{payload.domain}}"
+        to_label: "{{payload.device.name or payload.clientIp}}:{{payload.domain}}"
         to_kind: DNSQuery
 
 # --- Threat-intelligence routing ---
