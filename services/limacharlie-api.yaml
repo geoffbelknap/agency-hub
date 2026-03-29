@@ -1,0 +1,75 @@
+# Managed by agency hub — do not edit.
+# To customize, create a new service file in ~/.agency/registry/services/
+service: limacharlie-api
+display_name: LimaCharlie API
+api_base: "https://api.limacharlie.io"
+author: geoffbelknap
+license: Apache-2.0
+description: >
+  LimaCharlie endpoint security platform. Query detections, sensor
+  inventory, process trees, and artifacts for security operations.
+credential:
+  env_var: LIMACHARLIE_API_KEY
+  header: Authorization
+  format: "Bearer {key}"
+  scoped_prefix: agency-scoped-limacharlie
+usage_example: |
+  Set LIMACHARLIE_API_KEY to your LimaCharlie API key.
+  Set LC_ORG_ID to your organization ID.
+
+  curl -s -H "X-Agency-Service: limacharlie-api" \
+    -H "Authorization: Bearer {scoped_token}" \
+    "https://api.limacharlie.io/v1/insight/${LC_ORG_ID}/detections?start=1711500000&end=1711600000"
+
+  See https://doc.limacharlie.io/docs/api/
+tools:
+  - name: get_alert_detail
+    description: >
+      Get full details for a LimaCharlie detection/alert including process
+      information, command line, and event metadata.
+    parameters:
+      - name: detect_id
+        description: "Detection ID from the alert"
+        required: true
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/detections/{detect_id}
+
+  - name: get_process_tree
+    description: >
+      Get the process tree for a sensor at a point in time. Shows parent/child
+      process relationships, command lines, and module loads. Expensive call —
+      use only when alert detail is insufficient.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID) of the endpoint"
+        required: true
+      - name: process_id
+        description: "Process ID to root the tree at"
+        required: true
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/processes/{sensor_id}/{process_id}
+
+  - name: get_sensor_artifacts
+    description: >
+      Get artifacts collected from a sensor. Returns installed packages,
+      running services, network connections, or other endpoint state.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID) of the endpoint"
+        required: true
+      - name: artifact_type
+        description: "Type: os_packages, os_services, network_connections, autoruns"
+        required: false
+        default: "os_packages"
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/artifacts/{sensor_id}
+    query_params:
+      type: artifact_type
+
+  - name: get_sensors
+    description: >
+      List all sensors (endpoints) in the organization with their status,
+      hostname, platform, and last seen time.
+    parameters: []
+    method: GET
+    path: /v1/sensors/${LC_ORG_ID}
