@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   stamp:
@@ -34,8 +35,9 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: python scripts/stamp_metadata.py --ref "$COMMIT_SHA"
 
-      - name: Commit and push
+      - name: Create PR for metadata stamps
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHORT_SHA: ${{ github.sha }}
         run: |
           git config user.name "agency-hub-bot"
@@ -43,7 +45,15 @@ jobs:
           git add -A '*/metadata.yaml'
           if git diff --cached --quiet; then
             echo "No metadata changes to commit."
-          else
-            git commit -m "chore: stamp metadata for ${SHORT_SHA:0:7}"
-            git push
+            exit 0
           fi
+          BRANCH="bot/stamp-metadata-${SHORT_SHA:0:7}"
+          git checkout -b "$BRANCH"
+          git commit -m "chore: stamp metadata for ${SHORT_SHA:0:7}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: stamp metadata for ${SHORT_SHA:0:7}" \
+            --body "Automated metadata stamping for commit ${SHORT_SHA:0:7}." \
+            --head "$BRANCH" \
+            --base main
+          gh pr merge "$BRANCH" --auto --squash
