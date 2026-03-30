@@ -1,6 +1,6 @@
-name: slack-ops
-kind: pack
-version: 1.0.0
+name: unifi-sites
+kind: connector
+version: 0.2.0
 build: 84a2a8b
 published_at: '2026-03-30T03:54:58.339635+00:00'
 reviewed_by: bot
