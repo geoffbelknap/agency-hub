@@ -30,3 +30,9 @@ recommended_connectors:
   - unifi
   - unifi-hosts
   - unifi-sites
+
+mission_assignments:
+  - mission: alert-triage
+    agent: alert-triage
+  - mission: security-explorer
+    agent: security-explorer
