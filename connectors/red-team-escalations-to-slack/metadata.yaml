@@ -1,6 +1,6 @@
 name: red-team-escalations-to-slack
 kind: connector
 version: 1.0.0
-build: 00270b7
-published_at: '2026-03-28T18:02:33.412986+00:00'
+build: 1027dbc
+published_at: '2026-03-30T07:41:32.257944+00:00'
 reviewed_by: bot

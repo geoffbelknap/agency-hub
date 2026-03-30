@@ -1,6 +1,6 @@
-name: red-team
-kind: pack
-version: 1.0.0
+name: limacharlie-sensors
+kind: connector
+version: 0.2.0
 build: 1027dbc
 published_at: '2026-03-30T07:41:32.257944+00:00'
 reviewed_by: bot
