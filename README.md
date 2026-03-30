@@ -1,216 +1,152 @@
 # Agency Hub
 
-Default component registry for the [Agency platform](https://github.com/geoffbelknap/agency).
+The package manager for [Agency](https://github.com/geoffbelknap/agency). Discover, install, and share connectors, services, presets, missions, and packs.
 
-## Structure
+**Want to contribute a component?** See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```
-packs/          Declarative team compositions (pack.yaml + connectors)
-connectors/     External system bindings (webhook, poll, schedule, channel-watch)
-services/       Service definitions (Slack, Jira)
-presets/        Agent preset definitions
-skills/         Agent skill packages
-policies/       Policy templates
-workspaces/     Workspace definitions
-pricing/        LLM model pricing (synced to routing.yaml by agency hub update)
-```
-
-## Hub-Managed Files
-
-`agency hub update` syncs these files from the hub into `~/.agency/`. They are overwritten on every update — do not edit them directly.
-
-| File | Location | Operator customization |
-|------|----------|----------------------|
-| `routing.yaml` | `~/.agency/infrastructure/routing.yaml` | Use `routing.local.yaml` for custom providers, models, pricing |
-| Service definitions | `~/.agency/registry/services/*.yaml` | Create new files — don't edit hub-managed ones |
-| Base ontology | `~/.agency/knowledge/base-ontology.yaml` | Add files to `~/.agency/knowledge/ontology.d/` |
-
-## Usage
-
-Add this hub source to `~/.agency/config.yaml`:
-
-```yaml
-hub:
-  sources:
-    - name: official
-      url: https://github.com/geoffbelknap/agency-hub.git
-      branch: main
-```
-
-## Hub CLI Commands
+## Install a Component
 
 ```bash
-# Cache management
-agency hub update                         # refresh hub sources (git pull, no writes to ~/.agency/)
-agency hub outdated                       # show available upgrades from cache
-agency hub upgrade [component...]         # apply upgrades (managed files + components)
+agency hub install limacharlie          # auto-detects kind, shows consent prompt
+agency hub install security-ops         # pack — deploys a full team
+```
 
+No `--kind` needed — names are auto-detected. The install prompt shows what credentials and egress domains the component needs before you approve.
+
+## Deploy a Pack
+
+```bash
+agency hub deploy security-ops
+```
+
+One command: installs dependencies, creates the team, assigns missions.
+
+## Create and Publish
+
+```bash
+agency hub create connector my-scanner  # scaffold
+nano my-scanner/connector.yaml          # edit
+agency hub audit my-scanner             # validate
+agency hub publish my-scanner           # submit PR
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+## CLI Reference
+
+```bash
 # Discovery
-agency hub search <query>                 # search available components
-agency hub list                           # list available and installed components
-agency hub info <name>                    # show component details
+agency hub search <query>               # search components
+agency hub info <name>                  # detailed info
 
-# Install / remove
-agency hub install <name> --kind <kind>   # install a component
-agency hub remove <name>                  # remove installed component
-
-# Instance management
-agency hub instances                      # list installed instances
-agency hub show <nameOrID>                # show instance detail
-agency hub activate <nameOrID>            # activate; use --set KEY=VALUE for credentials
-agency hub deactivate <nameOrID>          # deactivate
+# Install / Remove
+agency hub install <name>              # install + activate + resolve deps
+agency hub remove <name>               # remove component
+agency hub deactivate <name>           # stop without removing
 
 # Packs
-agency hub deploy <pack.yaml>             # deploy a pack
+agency hub deploy <name>               # deploy pack (team + missions)
+agency hub teardown <name>             # stop agents, archive channels
+
+# Updates
+agency hub update                      # refresh sources (git pull)
+agency hub outdated                    # show available upgrades
+agency hub upgrade [name...]           # apply upgrades
+
+# Health
+agency hub check [name]                # component health
+agency hub doctor                      # system-wide health
+
+# Sources
+agency hub add-source <name> <url>     # add third-party source
+agency hub list-sources                # show sources
+agency hub remove-source <name>        # remove source
+
+# Publishing
+agency hub create <kind> <name>        # scaffold component
+agency hub audit <path>                # validate before publishing
+agency hub publish <path>              # submit PR to source
 ```
 
-## Available Packs
+## Available Components
 
-### `slack-ops`
-
-Ops team that monitors a Slack channel for requests, incidents, and evaluation
-tasks. Agents read message threads, investigate, and post findings back to
-Slack. Bidirectional — Slack is both the work source and the output channel.
-
-**Required environment variables:**
-- `SLACK_BOT_TOKEN` — Bot User OAuth Token (`xoxb-...`)
-- `SLACK_CHANNEL_ID` — ID of the Slack channel to monitor
-
-**Slack app scopes:**
-`channels:history`, `channels:read`, `chat:write`, `reactions:read`,
-`reactions:write`, `users:read`, `files:read`, `files:write`, `search:read`
-
-**Bot user ID placeholder:** The `slack-ops` connector routes `@mention`
-messages using a regex pattern. Replace `U0YOURBOTUSERID` in
-`connectors/slack-ops/connector.yaml` with your bot's Slack user ID (find it
-in your Slack App settings under *OAuth & Permissions → Bot User ID*, or call
-`https://slack.com/api/auth.test` with your token).
-
-```bash
-agency hub install slack-ops
-```
-
----
-
-### `jira-ops`
-
-Ops team that owns a Jira Cloud queue. Polls for new and updated issues, routes
-by issue type and priority, and posts findings back to tickets.
-
-**Required environment variables:**
-- `JIRA_API_TOKEN` — Base64-encoded `email@example.com:api-token`
-- `JIRA_DOMAIN` — Your Jira subdomain (e.g. `mycompany` for `mycompany.atlassian.net`)
-- `JIRA_PROJECT_KEY` — Project key to monitor (e.g. `OPS`)
-
-**Getting a Jira API token:** <https://id.atlassian.com/manage-profile/security/api-tokens>
-
-```bash
-agency hub install jira-ops
-```
-
----
-
-### `security-ops`
-
-Phase 1 security operations pack. Observe-and-report only — no remediation actions. Ships two agents:
-
-- **alert-triage** (Haiku) — assesses incoming alerts from security connectors, classifies severity, and posts findings.
-- **security-explorer** (Sonnet) — scheduled environment enrichment; queries connected security tools and builds context in the knowledge graph.
-
-```bash
-agency hub install security-ops
-```
-
----
-
-### `red-team`
-
-Red team coordination pack for **authorized** security testing. A coordinator
-delegates reconnaissance and exploitation tasks to specialist agents. Findings
-are contributed to the organizational knowledge graph so prior work compounds
-across engagements.
-
-The pack ships with an `AGENTS.md` that defines authorized scope, required
-behaviors, and hard limits for all agents. **Edit `packs/red-team/AGENTS.md`
-before deployment** to set the `AUTHORIZED_TARGETS` for your engagement.
-
-**Optional connector:** activate `red-team-escalations-to-slack` to surface
-escalations in Slack in real time (requires `SLACK_BOT_TOKEN` and
-`SLACK_ESCALATION_CHANNEL_ID`).
-
-```bash
-agency hub install red-team
-```
-
----
-
-### Connectors
-
-Each pack bundles one or more connectors, but connectors can also be installed
-standalone. The `slack-ops` connector (bundled with the `slack-ops` pack) and
-`jira-ops` connector (bundled with the `jira-ops` pack) can be used
-independently with any agent team.
-
-| Name | Type | Description |
-|------|------|-------------|
-| `slack-ops` | poll | Poll a Slack channel for messages; route by pattern |
-| `slack-events` | webhook | Receive Slack Events API webhooks in real time |
-| `jira-ops` | poll | Poll a Jira project for new/updated issues |
-| `comms-to-slack` | channel-watch | Mirror agency comms channel to a Slack channel |
-| `red-team-escalations-to-slack` | channel-watch | Surface red-team escalations in Slack |
-| `limacharlie` | poll | Poll LC Insight detections API; routes high/critical detections to triage mission |
-| `limacharlie-sensors` | poll | Poll LC sensor inventory; graph-only |
-| `nextdns-blocked` | poll | Poll blocked DNS queries; graph-only + threat-intel routing |
-| `nextdns-analytics` | poll | Poll domain analytics; graph-only |
-| `unifi` | poll | Poll UniFi infrastructure devices; graph-only |
-| `unifi-hosts` | poll | Poll UniFi console inventory; graph-only |
-| `unifi-sites` | poll | Poll UniFi site topology; graph-only |
-
-```bash
-agency hub install slack-events
-```
-
-#### `slack-events` environment variables
-
-- `SLACK_BOT_TOKEN` — Bot User OAuth Token
-- `SLACK_SIGNING_SECRET` — App signing secret (used to verify HMAC-SHA256 webhook signatures)
-
-Configure your Slack App's *Event Subscriptions URL* to point at:
-```
-https://<your-host>/webhooks/slack-events
-```
-
-The intake handles the Slack URL verification challenge automatically.
-
-## Presets
-
-Presets are agent configuration templates installed to `~/.agency/registry/presets/`. Install via `agency hub install <name> --kind preset`.
+### Packs
 
 | Name | Description |
 |------|-------------|
-| `security-triage` | Fast tier, autonomous alert assessment. Used by the `alert-triage` agent in `security-ops`. |
-| `security-explorer` | Standard tier, scheduled environment enrichment. Used by the `security-explorer` agent in `security-ops`. |
+| `security-ops` | Phase 1 security operations — alert triage (Haiku) + environment explorer (Sonnet) |
+| `slack-ops` | Slack channel monitoring — polls channels, routes by pattern |
+| `jira-ops` | Jira queue management — polls issues, routes by type/priority |
+| `red-team` | Authorized security testing coordination |
 
-## Services
+### Connectors
 
-Service definitions declare the external APIs that connectors and agents depend on. Installed to `~/.agency/registry/services/` by `agency hub update`.
+| Name | Type | Description |
+|------|------|-------------|
+| `limacharlie` | poll | LimaCharlie endpoint security alerts |
+| `limacharlie-sensors` | poll | LimaCharlie sensor inventory (graph-only) |
+| `nextdns-blocked` | poll | NextDNS blocked DNS queries |
+| `nextdns-analytics` | poll | NextDNS domain analytics (graph-only) |
+| `unifi` | poll | UniFi infrastructure devices (graph-only) |
+| `unifi-hosts` | poll | UniFi console inventory (graph-only) |
+| `unifi-sites` | poll | UniFi site topology (graph-only) |
+| `slack-ops` | poll | Slack channel polling |
+| `slack-events` | webhook | Slack Events API real-time |
+| `jira-ops` | poll | Jira issue polling |
+| `comms-to-slack` | channel-watch | Mirror comms to Slack |
 
-| Name | API domain |
-|------|-----------|
-| `brave-search` | `api.search.brave.com` |
-| `github` | `api.github.com` |
-| `jira` | `*.atlassian.net` |
-| `limacharlie-api` | `api.limacharlie.io` |
-| `nextdns-api` | `api.nextdns.io` |
-| `slack` | `slack.com` |
-| `unifi-api` | `unifi.ui.com` |
+### Services
+
+| Name | Domain |
+|------|--------|
+| `limacharlie-api` | api.limacharlie.io |
+| `nextdns-api` | api.nextdns.io |
+| `unifi-api` | api.ui.com |
+| `brave-search` | api.search.brave.com |
+| `slack` | slack.com |
+| `jira` | *.atlassian.net |
+| `github` | api.github.com |
+
+### Presets
+
+| Name | Tier | Description |
+|------|------|-------------|
+| `security-triage` | fast | Autonomous alert assessment |
+| `security-explorer` | standard | Scheduled environment enrichment |
+
+### Missions
+
+| Name | Trigger | Description |
+|------|---------|-------------|
+| `alert-triage` | LC connector | Triage security alerts, post to findings |
+| `security-explorer-mission` | Cron (6h) | Enrich knowledge graph with environment context |
+
+## Hub-Managed Files
+
+`agency hub update` syncs these files into `~/.agency/`. Do not edit them directly.
+
+| File | Customization |
+|------|--------------|
+| `routing.yaml` | Use `routing.local.yaml` for custom providers |
+| Service definitions | Create new files, don't edit hub-managed ones |
+| Base ontology | Add to `~/.agency/knowledge/ontology.d/` |
+
+## Third-Party Sources
+
+Host your own hub:
+
+```bash
+# Users add your source
+agency hub add-source my-org https://github.com/my-org/agency-hub.git
+
+# Then install from it
+agency hub install my-connector --source my-org
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for hub repo structure and CI setup.
 
 ## CI
 
-### Review bot
+**Review bot** — validates PRs, auto-approves routine changes, flags security surface changes.
 
-Validates connector PRs on every push. Auto-approves routine changes (doc edits, pricing updates, patch bumps). Flags changes that expand security surface — new egress domains, new credential types, new syscall allowances — for human review before merge.
-
-### Stamp metadata
-
-On merge to `main`, a workflow stamps `metadata.yaml` with the build hash and opens a PR with auto-merge enabled. This ensures every release has a traceable content hash for staleness detection.
+**Stamp metadata** — stamps `metadata.yaml` with build hash on merge.
