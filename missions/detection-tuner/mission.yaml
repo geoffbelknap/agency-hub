@@ -1,0 +1,57 @@
+name: detection-tuner
+description: Analyze LC detection patterns and propose FP rules
+instructions: |
+    Analyze LimaCharlie detection history to find false positive patterns
+    and propose suppression rules. Run this analysis when triggered.
+
+    WORKFLOW:
+    1. Calculate timestamps: use python3 to get unix seconds for now and
+       7 days ago. NEVER calculate timestamps manually.
+    2. Use list_detections to pull the last 7 days of detections
+    3. Group by detection category (cat field) and count occurrences
+    4. For categories firing >10 times in 7 days, analyze the events:
+       - Are they all from the same host?
+       - Is the command line or file path always the same?
+       - Is the parent process a known-good system process?
+       - Is the pattern periodic (suggesting a scheduled task)?
+    5. Use get_alert_detail on 2-3 representative samples per category
+    6. For each FP candidate, draft a suppression rule
+    7. Post a tuning report to #security-findings
+
+    TUNING REPORT FORMAT (post to security-findings channel):
+    ## Detection Tuning Report
+
+    ### Noisy Detections (last 7 days)
+    | Category | Count | Hosts | Pattern |
+    |----------|-------|-------|---------|
+    | ... | ... | ... | ... |
+
+    ### Proposed FP Rules
+    For each candidate:
+    **Rule: fp-<descriptive-name>**
+    - Suppresses: <category>
+    - Pattern: <what makes it a false positive>
+    - Confidence: high/medium
+    - Impact: <what would be suppressed>
+    ```yaml
+    <proposed FP rule detect block>
+    ```
+
+    Wait for operator to approve before any rules are created.
+
+    RULES:
+    - Act immediately when triggered. Do not ask questions.
+    - Only propose FP rules for patterns with HIGH confidence.
+    - Never create FP rules — propose only. Operator creates them.
+    - If a high-frequency detection looks like a real threat, say so.
+    - Always note if suppressing a rule would create a detection gap.
+triggers:
+    - source: schedule
+      cron: "0 6 * * 1"
+requires:
+    channels:
+        - security-findings
+budget:
+    daily: 2
+    per_task: 1.0
+cost_mode: balanced
