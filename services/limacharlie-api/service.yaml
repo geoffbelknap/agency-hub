@@ -1,13 +1,15 @@
-# Managed by agency hub — do not edit.
-# To customize, create a new service file in ~/.agency/registry/services/
+# LimaCharlie API Service — Full Management Surface
+# Covers: detections, sensors, D&R rules, FP rules, sensor tasking,
+# timeline queries, IOC search, extensions, and org management.
 service: limacharlie-api
 display_name: LimaCharlie API
 api_base: "https://api.limacharlie.io"
 author: geoffbelknap
 license: Apache-2.0
 description: >
-  LimaCharlie endpoint security platform. Query detections, sensor
-  inventory, process trees, and artifacts for security operations.
+  LimaCharlie endpoint security platform. Full management API for
+  detections, sensors, D&R rules, FP rules, sensor tasking, timeline
+  queries, IOC search, and organizational operations.
 credential:
   env_var: LIMACHARLIE_API_KEY
   header: Authorization
@@ -16,17 +18,40 @@ credential:
 usage_example: |
   Set LIMACHARLIE_API_KEY to your LimaCharlie API key.
   Set LC_ORG_ID to your organization ID.
+  Auth is handled by the egress JWT swap — agents don't hold real keys.
 
-  curl -s -H "X-Agency-Service: limacharlie-api" \
-    -H "Authorization: Bearer {scoped_token}" \
-    "https://api.limacharlie.io/v1/insight/${LC_ORG_ID}/detections?start=1711500000&end=1711600000"
-
-  See https://doc.limacharlie.io/docs/api/
 tools:
+  # ── Detection & Alert Queries ──────────────────────────────────
+
+  - name: list_detections
+    description: >
+      List detections for a time range. Returns category, severity,
+      hostname, event data, MITRE tags. Start/end are unix seconds.
+    parameters:
+      - name: start
+        description: "Start time (unix seconds)"
+        required: true
+      - name: end
+        description: "End time (unix seconds)"
+        required: true
+      - name: cat
+        description: "Filter by detection category name"
+        required: false
+      - name: limit
+        description: "Max results to return"
+        required: false
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/detections
+    query_params:
+      start: start
+      end: end
+      cat: cat
+      limit: limit
+
   - name: get_alert_detail
     description: >
-      Get full details for a LimaCharlie detection/alert including process
-      information, command line, and event metadata.
+      Get full details for a detection including process info, command
+      line, hashes, parent chain, and event metadata.
     parameters:
       - name: detect_id
         description: "Detection ID from the alert"
@@ -34,14 +59,181 @@ tools:
     method: GET
     path: /v1/insight/${LC_ORG_ID}/detections/{detect_id}
 
-  - name: get_process_tree
+  # ── Sensor Management ──────────────────────────────────────────
+
+  - name: get_sensors
     description: >
-      Get the process tree for a sensor at a point in time. Shows parent/child
-      process relationships, command lines, and module loads. Expensive call —
-      use only when alert detail is insufficient.
+      List all sensors in the org with status, hostname, platform,
+      architecture, tags, and last seen time.
+    parameters: []
+    method: GET
+    path: /v1/sensors/${LC_ORG_ID}
+
+  - name: get_sensor_detail
+    description: >
+      Get detailed info for a single sensor including hostname, IPs,
+      platform, enrollment date, online status, and tags.
     parameters:
       - name: sensor_id
-        description: "Sensor ID (SID) of the endpoint"
+        description: "Sensor ID (SID)"
+        required: true
+    method: GET
+    path: /v1/${sensor_id}
+
+  - name: get_sensor_overview
+    description: >
+      Get sensor activity overview for a time window. Shows event type
+      distributions and activity summary.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+      - name: start
+        description: "Start time (unix seconds)"
+        required: true
+      - name: end
+        description: "End time (unix seconds)"
+        required: true
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/{sensor_id}/overview
+    query_params:
+      start: start
+      end: end
+
+  - name: tag_sensor
+    description: >
+      Add a tag to a sensor. Tags are used for grouping, targeting
+      D&R rules, and fleet management.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+      - name: tag
+        description: "Tag to add"
+        required: true
+    method: POST
+    path: /v1/${sensor_id}/tags
+    body:
+      tags: "{tag}"
+
+  - name: untag_sensor
+    description: >
+      Remove a tag from a sensor.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+      - name: tag
+        description: "Tag to remove"
+        required: true
+    method: DELETE
+    path: /v1/${sensor_id}/tags
+    query_params:
+      tags: tag
+
+  - name: isolate_sensor
+    description: >
+      Network-isolate a sensor. The sensor can still communicate with
+      LC but all other network access is blocked. REQUIRES OPERATOR
+      APPROVAL — never call without explicit confirmation.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+    method: POST
+    path: /v1/${sensor_id}/isolation
+
+  - name: rejoin_sensor
+    description: >
+      Remove network isolation from a sensor, restoring normal
+      network access. REQUIRES OPERATOR APPROVAL.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+    method: DELETE
+    path: /v1/${sensor_id}/isolation
+
+  # ── Sensor Tasking ─────────────────────────────────────────────
+
+  - name: task_sensor
+    description: >
+      Send a task (command) to an online sensor. Common tasks:
+      os_processes, os_version, netstat, dir_list, file_get, mem_map,
+      dns_resolve, os_services, os_autoruns, history_dump. Returns
+      task results directly if sensor is online.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+      - name: task
+        description: "Task command (e.g. 'os_processes' or 'dir_list -d C:\\Users')"
+        required: true
+    method: POST
+    path: /v1/${sensor_id}/task
+    body:
+      task: "{task}"
+
+  - name: reliable_task_sensor
+    description: >
+      Queue a task for a sensor via reliable tasking. Persists until
+      the sensor comes online (up to TTL). Use for offline sensors or
+      when delivery guarantee is needed.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+      - name: task
+        description: "Task command"
+        required: true
+      - name: ttl
+        description: "Time-to-live in seconds (default 86400 = 24h)"
+        required: false
+    method: POST
+    path: /v1/${sensor_id}/task/reliable
+    body:
+      task: "{task}"
+      ttl: "{ttl}"
+
+  # ── Timeline & Event Queries ───────────────────────────────────
+
+  - name: get_timeline
+    description: >
+      Get raw event timeline for a sensor in a time window. Returns
+      all telemetry events (process creation, network, file, etc.).
+      Can be very large — use short time windows.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
+        required: true
+      - name: start
+        description: "Start time (unix seconds)"
+        required: true
+      - name: end
+        description: "End time (unix seconds)"
+        required: true
+      - name: event_type
+        description: "Filter by event type (e.g. NEW_PROCESS, DNS_REQUEST)"
+        required: false
+      - name: limit
+        description: "Max events to return"
+        required: false
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/{sensor_id}/timeline
+    query_params:
+      start: start
+      end: end
+      event_type: event_type
+      limit: limit
+
+  - name: get_process_tree
+    description: >
+      Get the process tree for a sensor. Shows parent/child process
+      relationships, command lines, and module loads. Expensive — use
+      only when timeline/alert detail is insufficient.
+    parameters:
+      - name: sensor_id
+        description: "Sensor ID (SID)"
         required: true
       - name: process_id
         description: "Process ID to root the tree at"
@@ -49,13 +241,124 @@ tools:
     method: GET
     path: /v1/insight/${LC_ORG_ID}/processes/{sensor_id}/{process_id}
 
+  # ── IOC Search ─────────────────────────────────────────────────
+
+  - name: search_ioc
+    description: >
+      Search for an IOC across the organization. Supports: file_hash
+      (MD5/SHA1/SHA256), domain, ip, file_path, file_name, user. Returns
+      matching sensors and event context.
+    parameters:
+      - name: ioc_type
+        description: "IOC type: file_hash, domain, ip, file_path, file_name, user"
+        required: true
+      - name: ioc_value
+        description: "The IOC value to search for"
+        required: true
+    method: GET
+    path: /v1/insight/${LC_ORG_ID}/iocs
+    query_params:
+      type: ioc_type
+      ioc: ioc_value
+
+  # ── D&R Rules ──────────────────────────────────────────────────
+
+  - name: list_dr_rules
+    description: >
+      List all D&R rules in the organization. Returns rule names,
+      detect/respond logic, tags, and enabled status.
+    parameters: []
+    method: GET
+    path: /v1/rules/${LC_ORG_ID}
+
+  - name: get_dr_rule
+    description: >
+      Get a specific D&R rule by name.
+    parameters:
+      - name: name
+        description: "Rule name"
+        required: true
+    method: GET
+    path: /v1/rules/${LC_ORG_ID}/{name}
+
+  - name: create_dr_rule
+    description: >
+      Create or update a D&R rule. REQUIRES OPERATOR APPROVAL for new
+      rules. Always validate with validate_dr_rule first.
+    parameters:
+      - name: name
+        description: "Rule name"
+        required: true
+      - name: detect
+        description: "Detection logic (YAML)"
+        required: true
+      - name: respond
+        description: "Response actions (YAML)"
+        required: true
+      - name: is_enabled
+        description: "Whether the rule is enabled (default true)"
+        required: false
+    method: POST
+    path: /v1/rules/${LC_ORG_ID}/{name}
+    body:
+      detect: "{detect}"
+      respond: "{respond}"
+      is_enabled: "{is_enabled}"
+
+  - name: delete_dr_rule
+    description: >
+      Delete a D&R rule. REQUIRES OPERATOR APPROVAL.
+    parameters:
+      - name: name
+        description: "Rule name to delete"
+        required: true
+    method: DELETE
+    path: /v1/rules/${LC_ORG_ID}/{name}
+
+  # ── FP Suppression Rules ───────────────────────────────────────
+
+  - name: list_fp_rules
+    description: >
+      List all false positive suppression rules.
+    parameters: []
+    method: GET
+    path: /v1/fps/${LC_ORG_ID}
+
+  - name: create_fp_rule
+    description: >
+      Create an FP suppression rule. REQUIRES OPERATOR APPROVAL —
+      always propose the rule and get confirmation first.
+    parameters:
+      - name: name
+        description: "Rule name (e.g. fp-wsl-echo-userprofile)"
+        required: true
+      - name: detect
+        description: "Detection logic to suppress (YAML)"
+        required: true
+    method: POST
+    path: /v1/fps/${LC_ORG_ID}/{name}
+    body:
+      detect: "{detect}"
+
+  - name: delete_fp_rule
+    description: >
+      Delete an FP suppression rule. REQUIRES OPERATOR APPROVAL.
+    parameters:
+      - name: name
+        description: "FP rule name to delete"
+        required: true
+    method: DELETE
+    path: /v1/fps/${LC_ORG_ID}/{name}
+
+  # ── Artifacts ──────────────────────────────────────────────────
+
   - name: get_sensor_artifacts
     description: >
-      Get artifacts collected from a sensor. Returns installed packages,
-      running services, network connections, or other endpoint state.
+      Get artifacts collected from a sensor (packages, services,
+      connections, autoruns).
     parameters:
       - name: sensor_id
-        description: "Sensor ID (SID) of the endpoint"
+        description: "Sensor ID (SID)"
         required: true
       - name: artifact_type
         description: "Type: os_packages, os_services, network_connections, autoruns"
@@ -66,10 +369,21 @@ tools:
     query_params:
       type: artifact_type
 
-  - name: get_sensors
+  # ── Extensions ─────────────────────────────────────────────────
+
+  - name: list_extensions
     description: >
-      List all sensors (endpoints) in the organization with their status,
-      hostname, platform, and last seen time.
+      List all subscribed extensions in the organization.
     parameters: []
     method: GET
-    path: /v1/sensors/${LC_ORG_ID}
+    path: /v1/extensions/${LC_ORG_ID}
+
+  # ── Org Info ───────────────────────────────────────────────────
+
+  - name: get_org_info
+    description: >
+      Get organization information including name, quotas, and
+      feature flags.
+    parameters: []
+    method: GET
+    path: /v1/orgs/${LC_ORG_ID}

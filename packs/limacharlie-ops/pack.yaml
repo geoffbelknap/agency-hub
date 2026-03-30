@@ -1,0 +1,47 @@
+kind: pack
+name: limacharlie-ops
+version: "0.1.0"
+description: >
+  LimaCharlie management pack. Four specialist agents that manage
+  the LC deployment: detection engineering, detection tuning, fleet
+  health monitoring, and proactive threat hunting. All agents report
+  to #security-findings and require operator approval for changes.
+author: geoffbelknap
+
+team:
+  name: limacharlie-ops
+
+  agents:
+    - name: detection-engineer
+      preset: detection-engineer
+      role: standard
+
+    - name: detection-tuner
+      preset: detection-tuner
+      role: standard
+
+    - name: fleet-manager
+      preset: fleet-manager
+      role: standard
+
+    - name: threat-hunter
+      preset: threat-hunter
+      role: standard
+
+  channels:
+    - name: security-findings
+      topic: "Security findings, alerts, and observations"
+
+recommended_connectors:
+  - limacharlie
+  - limacharlie-sensors
+
+mission_assignments:
+  - mission: detection-engineer
+    agent: detection-engineer
+  - mission: detection-tuner
+    agent: detection-tuner
+  - mission: fleet-manager
+    agent: fleet-manager
+  - mission: threat-hunter
+    agent: threat-hunter
