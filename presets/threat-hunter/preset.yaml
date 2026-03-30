@@ -75,3 +75,19 @@ expertise:
     - timeline
     - lateral-movement
     - persistence
+
+requires:
+  workspace:
+    pip:
+      - limacharlie>=5.0
+    env:
+      LIMACHARLIE_API_KEY: "${credential:limacharlie-api}"
+      LC_ORG_ID: "${config:LC_ORG_ID}"
+  credentials:
+    - name: limacharlie-api
+      grant_name: limacharlie-api
+  egress_domains:
+    - api.limacharlie.io
+    - jwt.limacharlie.io
+    - pypi.org
+    - files.pythonhosted.org
