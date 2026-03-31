@@ -1,6 +1,6 @@
 name: jira-ops
 kind: pack
 version: 1.0.0
-build: 00270b7
-published_at: '2026-03-28T18:02:33.412986+00:00'
+build: bfe8c32
+published_at: '2026-03-31T06:20:48.608587+00:00'
 reviewed_by: bot
