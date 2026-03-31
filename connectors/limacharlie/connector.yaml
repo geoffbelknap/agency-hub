@@ -6,7 +6,7 @@
 # Activate: agency connector activate limacharlie
 #
 # Credentials:
-#   agency grant --global limacharlie-api --key-env LC_API_KEY
+#   Uses the alert-triage scoped API key (LC_API_KEY_ALERT_TRIAGE)
 #   Set LC_ORG_ID in ~/.agency/.env
 #
 # Auth: JWT exchange handled by egress proxy (jwt-swap.yaml config).
@@ -24,11 +24,11 @@ license: MIT
 
 requires:
   credentials:
-    - name: LC_API_KEY
+    - name: LC_API_KEY_ALERT_TRIAGE
       description: LimaCharlie API key (insight.det.get, sensor.get scopes)
       type: secret
       scope: service-grant
-      grant_name: limacharlie-api
+      grant_name: limacharlie-alert-triage
       setup_url: "https://app.limacharlie.io/api-keys"
     - name: LC_ORG_ID
       description: LimaCharlie organization ID
@@ -47,7 +47,7 @@ requires:
     - api.limacharlie.io
     - jwt.limacharlie.io
   services:
-    - limacharlie-api
+    - limacharlie-alert-triage
 
 source:
   type: poll
@@ -116,7 +116,7 @@ routes:
 
 mcp:
   name: limacharlie
-  credential: limacharlie-api
+  credential: limacharlie-alert-triage
   api_base: "https://api.limacharlie.io/v1"
   tools:
     - name: get_alert_detail

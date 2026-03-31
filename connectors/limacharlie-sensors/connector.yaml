@@ -11,7 +11,7 @@
 
 kind: connector
 name: limacharlie-sensors
-version: 0.2.0
+version: 0.3.0
 description: >
   LimaCharlie sensor inventory connector. Polls sensor list every 15 minutes
   and writes Device nodes to the knowledge graph with current status, IP
@@ -21,11 +21,11 @@ license: MIT
 
 requires:
   credentials:
-    - name: LC_API_KEY
+    - name: LC_API_KEY_FLEET_MANAGER
       description: LimaCharlie API key (sensor.list scope)
       type: secret
       scope: service-grant
-      grant_name: limacharlie-api
+      grant_name: limacharlie-fleet-manager
       setup_url: "https://app.limacharlie.io/api-keys"
     - name: LC_ORG_ID
       description: LimaCharlie organization ID
@@ -35,7 +35,7 @@ requires:
   egress_domains:
     - api.limacharlie.io
   services:
-    - limacharlie-api
+    - limacharlie-fleet-manager
 
 source:
   type: poll
