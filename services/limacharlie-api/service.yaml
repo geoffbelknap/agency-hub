@@ -11,7 +11,7 @@ description: >
   detections, sensors, D&R rules, FP rules, sensor tasking, timeline
   queries, IOC search, and organizational operations.
 credential:
-  env_var: LIMACHARLIE_API_KEY
+  env_var: LC_API_KEY_ALERT_TRIAGE
   header: Authorization
   format: "Bearer {key}"
   scoped_prefix: agency-scoped-limacharlie
