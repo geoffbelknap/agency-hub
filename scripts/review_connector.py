@@ -17,6 +17,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -33,6 +34,29 @@ REQUIRED_TOP_LEVEL = {"kind", "name", "version", "source"}
 VALID_SOURCE_TYPES = {"webhook", "poll", "schedule", "channel-watch"}
 VALID_PRIORITIES = {"high", "normal", "low"}
 SECURITY_SURFACE_FIELDS = {"requires", "mcp"}
+
+REQUIRED_PRESET_FIELDS = {"name", "description", "type"}
+REQUIRED_PACK_FIELDS = {"name", "description"}
+
+SUSPICIOUS_IDENTITY_PATTERNS = [
+    r"ignore\s+previous",
+    r"you\s+are\s+now",
+    r"disregard\s+(all\s+)?prior",
+    r"forget\s+(all\s+)?previous",
+    r"new\s+instructions?\s*:",
+]
+
+
+# ---------------------------------------------------------------------------
+# Semver helpers
+# ---------------------------------------------------------------------------
+
+def parse_version(v: str) -> tuple:
+    """Parse semver string into comparable tuple. Returns (0, 0, 0) on failure."""
+    try:
+        return tuple(int(x) for x in str(v).split("."))
+    except (ValueError, AttributeError):
+        return (0, 0, 0)
 
 
 def validate_connector(data: dict, path: str) -> list[str]:
@@ -111,6 +135,79 @@ def _check_templates_recursive(obj, path: str, errors: list[str]):
 
 
 # ---------------------------------------------------------------------------
+# Preset validation
+# ---------------------------------------------------------------------------
+
+def validate_preset(data: dict, path: str) -> tuple:
+    """Validate a preset YAML. Returns (errors, security_flags).
+
+    security_flags are issues that require human review (exit 2) rather than
+    hard validation failures (exit 1).
+    """
+    errors = []
+    security_flags = []
+
+    # Required fields
+    for field in REQUIRED_PRESET_FIELDS:
+        if field not in data:
+            errors.append(f"{path}: missing required field '{field}'")
+
+    # Template safety
+    _check_templates_recursive(data, path, errors)
+
+    # hard_limits is a security surface — changes need human review
+    if "hard_limits" in data:
+        security_flags.append(
+            f"{path}: preset defines 'hard_limits' (agent security constraints) — "
+            "requires human review"
+        )
+
+    # Suspicious patterns in identity.body (XPIA / prompt-injection defence)
+    identity_body = data.get("identity", {}).get("body", "")
+    if identity_body:
+        for pattern in SUSPICIOUS_IDENTITY_PATTERNS:
+            if re.search(pattern, identity_body, re.IGNORECASE):
+                security_flags.append(
+                    f"{path}: identity.body contains suspicious pattern "
+                    f"'{pattern}' — possible prompt injection attempt"
+                )
+
+    return errors, security_flags
+
+
+# ---------------------------------------------------------------------------
+# Pack validation
+# ---------------------------------------------------------------------------
+
+def validate_pack(data: dict, path: str, known_connector_names: set) -> tuple:
+    """Validate a pack YAML. Returns (errors, warnings).
+
+    warnings are non-fatal issues printed but do not block or flag the PR.
+    """
+    errors = []
+    warnings = []
+
+    # Required fields
+    for field in REQUIRED_PACK_FIELDS:
+        if field not in data:
+            errors.append(f"{path}: missing required field '{field}'")
+
+    # Template safety
+    _check_templates_recursive(data, path, errors)
+
+    # Check that referenced connectors exist in the hub
+    for ref in data.get("connectors", []):
+        connector_name = ref if isinstance(ref, str) else ref.get("name", "")
+        if connector_name and connector_name not in known_connector_names:
+            warnings.append(
+                f"{path}: references connector '{connector_name}' "
+                "which is not present in the hub"
+            )
+
+    return errors, warnings
+
+
+# ---------------------------------------------------------------------------
 # Security surface diff
 # ---------------------------------------------------------------------------
 
@@ -133,11 +230,16 @@ def diff_security_surface(old: Optional[dict], new: dict, path: str) -> list[str
         flags.append(f"{path}: new credentials required: {added_creds}")
 
     # Egress domain changes
-    old_domains = _extract_domains(old)
-    new_domains = _extract_domains(new)
+    old_domains, _ = _extract_domains(old)
+    new_domains, new_dynamic_urls = _extract_domains(new)
     added_domains = new_domains - old_domains
     if added_domains:
         flags.append(f"{path}: new egress domains: {added_domains}")
+    if new_dynamic_urls:
+        flags.append(
+            f"{path}: egress destination is operator-controlled (dynamic host) — "
+            f"requires human review: {new_dynamic_urls}"
+        )
 
     # MCP tool changes
     old_tools = _extract_tool_names(old)
@@ -159,7 +261,7 @@ def diff_security_surface(old: Optional[dict], new: dict, path: str) -> list[str
     # Version — must be bumped
     old_ver = old.get("version", "0.0.0")
     new_ver = new.get("version", "0.0.0")
-    if new_ver <= old_ver:
+    if parse_version(new_ver) <= parse_version(old_ver):
         flags.append(f"{path}: version not bumped ({old_ver} -> {new_ver})")
 
     return flags
@@ -174,27 +276,47 @@ def _extract_credential_names(data: dict) -> set[str]:
     return creds - {""}
 
 
-def _extract_domains(data: dict) -> set[str]:
+def _extract_domains(data: dict) -> tuple:
+    """Return (domains: set[str], dynamic_host_urls: list[str]).
+
+    Domains is the set of resolved hostnames.  dynamic_host_urls collects any
+    URLs whose host portion contained ${VAR} placeholders — these need human
+    review because the egress destination is operator-controlled at runtime.
+    """
     domains = set()
+    dynamic_host_urls = []
     url = data.get("source", {}).get("url", "")
     if url:
-        domain = _domain_from_url(url)
+        domain, has_dynamic = _domain_from_url(url)
         if domain:
             domains.add(domain)
+        if has_dynamic:
+            dynamic_host_urls.append(url)
     mcp = data.get("mcp", {})
     if mcp.get("api_base"):
-        domain = _domain_from_url(mcp["api_base"])
+        domain, has_dynamic = _domain_from_url(mcp["api_base"])
         if domain:
             domains.add(domain)
-    return domains
+        if has_dynamic:
+            dynamic_host_urls.append(mcp["api_base"])
+    return domains, dynamic_host_urls
 
 
-def _domain_from_url(url: str) -> str:
-    """Extract domain from URL, ignoring ${VAR} placeholders."""
-    url = url.replace("${", "").replace("}", "")
-    if "://" in url:
-        url = url.split("://", 1)[1]
-    return url.split("/")[0].split(":")[0]
+def _domain_from_url(url: str) -> tuple:
+    """Extract domain from URL. Returns (domain, has_dynamic_host).
+
+    If the host portion contains ${VAR} placeholders the raw template is
+    returned as the domain and has_dynamic_host is True so callers can flag
+    the egress destination as operator-controlled and requiring human review.
+    """
+    host_part = url.split("://", 1)[1] if "://" in url else url
+    host_part = host_part.split("/")[0]
+    has_dynamic = bool(re.search(r"\$\{[^}]+\}", host_part))
+    cleaned = url.replace("${", "").replace("}", "")
+    if "://" in cleaned:
+        cleaned = cleaned.split("://", 1)[1]
+    domain = cleaned.split("/")[0].split(":")[0]
+    return domain, has_dynamic
 
 
 def _extract_tool_names(data: dict) -> set[str]:
@@ -211,14 +333,32 @@ def _extract_tool_defs(data: dict) -> dict:
 # Git diff helpers
 # ---------------------------------------------------------------------------
 
-def get_changed_connector_files(base: str, head: str) -> list[str]:
-    """Get list of changed connector YAML files between base and head."""
+def get_changed_component_files(base: str, head: str) -> list[str]:
+    """Get list of changed connector, preset, and pack YAML files between base and head."""
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{base}...{head}"],
         capture_output=True, text=True,
     )
     files = result.stdout.strip().split("\n")
-    return [f for f in files if f.startswith("connectors/") and f.endswith(".yaml")]
+    changed = []
+    for f in files:
+        if not f.endswith(".yaml"):
+            continue
+        if f.startswith("connectors/"):
+            changed.append(f)
+        elif f.startswith("presets/") and f.endswith("/preset.yaml"):
+            changed.append(f)
+        elif f.startswith("packs/") and f.endswith("/pack.yaml"):
+            changed.append(f)
+    return changed
+
+
+def _discover_known_connectors(repo_root: str = ".") -> set:
+    """Return connector names (directory names) present in the hub."""
+    connectors_dir = Path(repo_root) / "connectors"
+    if not connectors_dir.is_dir():
+        return set()
+    return {p.name for p in connectors_dir.iterdir() if p.is_dir()}
 
 
 def load_file_at_ref(ref: str, path: str) -> Optional[dict]:
@@ -246,14 +386,17 @@ def main():
     if args.files:
         changed_files = args.files
     else:
-        changed_files = get_changed_connector_files(args.base, args.head)
+        changed_files = get_changed_component_files(args.base, args.head)
 
     if not changed_files:
-        print("No connector files changed.")
+        print("No connector/preset/pack files changed.")
         sys.exit(0)
+
+    known_connectors = _discover_known_connectors()
 
     all_errors = []
     all_flags = []
+    all_warnings = []
 
     for filepath in changed_files:
         print(f"\nReviewing: {filepath}")
@@ -269,6 +412,40 @@ def main():
             print(f"  SKIP: file removed or unreadable")
             continue
 
+        # Route to the appropriate validator
+        if filepath.startswith("presets/"):
+            errors, sec_flags = validate_preset(new_data, filepath)
+            if errors:
+                for e in errors:
+                    print(f"  ERROR: {e}")
+                all_errors.extend(errors)
+            else:
+                print(f"  Schema: PASS")
+            if sec_flags:
+                for sf in sec_flags:
+                    print(f"  FLAG: {sf}")
+                all_flags.extend(sec_flags)
+            elif not errors:
+                print(f"  Security surface: unchanged")
+            continue
+
+        if filepath.startswith("packs/"):
+            errors, warnings = validate_pack(new_data, filepath, known_connectors)
+            if errors:
+                for e in errors:
+                    print(f"  ERROR: {e}")
+                all_errors.extend(errors)
+            else:
+                print(f"  Schema: PASS")
+            if warnings:
+                for w in warnings:
+                    print(f"  WARN: {w}")
+                all_warnings.extend(warnings)
+            elif not errors:
+                print(f"  Pack references: OK")
+            continue
+
+        # --- connector ---
         # Schema validation
         errors = validate_connector(new_data, filepath)
         if errors:
@@ -295,6 +472,10 @@ def main():
 
     # Summary
     print("\n" + "=" * 60)
+    if all_warnings:
+        print(f"WARNINGS: {len(all_warnings)} non-fatal issue(s)")
+        for w in all_warnings:
+            print(f"  - {w}")
     if all_errors:
         print(f"BLOCKED: {len(all_errors)} validation error(s)")
         for e in all_errors:

@@ -120,9 +120,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      # GATE: only validation failures (exit 1) block the status check.
-      # Human-review (exit 2) passes — the warning comment is informational.
-      # You reviewed the code before pushing; the bot confirms schema is valid.
+      # GATE: validation failures (exit 1) AND security surface changes (exit 2) block merge.
+      # Exit 2 requires explicit human approval via GitHub review before merging.
       - name: Status check gate
-        if: steps.review.outputs.exit_code == '1'
-        run: exit 1
+        if: steps.review.outputs.exit_code == '1' || steps.review.outputs.exit_code == '2'
+        env:
+          EXIT_CODE: ${{ steps.review.outputs.exit_code }}
+        run: |
+          if [ "$EXIT_CODE" == "1" ]; then
+            echo "::error::Schema validation failed — fix errors before merging"
+            exit 1
+          fi
+          echo "::error::Security surface changes detected — requires human approval review before merging"
+          exit 1

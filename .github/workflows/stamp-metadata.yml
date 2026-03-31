@@ -65,7 +65,7 @@ jobs:
           HEAD_SHA=$(git rev-parse HEAD)
           gh api "repos/${{ github.repository }}/statuses/$HEAD_SHA" \
             -f state=success \
-            -f context=review \
+            -f context=metadata-stamp \
             -f description="Metadata-only changes — auto-approved"
 
           gh pr merge "$BRANCH" --auto --squash
