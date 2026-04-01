@@ -86,6 +86,9 @@ requires:
   credentials:
     - name: limacharlie-api
       grant_name: limacharlie-api
+      scopes:
+        required: [insight.det.get, insight.evt.get, sensor.get]
+        optional: [sensor.task, ext.request, insight.stat]
   egress_domains:
     - api.limacharlie.io
     - jwt.limacharlie.io
