@@ -1,0 +1,14 @@
+name: default-wizard
+kind: setup
+
+capability_tiers:
+  minimal:
+    display_name: Minimal
+    description: LLM access only. No optional tools or services.
+    capabilities: []
+  standard:
+    display_name: Standard
+    description: Web search, web fetch, and commonly useful tools.
+    capabilities:
+      - brave-search
+      - web-fetch
