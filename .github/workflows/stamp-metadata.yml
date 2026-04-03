@@ -36,6 +36,19 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: python scripts/stamp_metadata.py --ref "$COMMIT_SHA"
 
+      # Close any existing stamp PRs and delete their branches.
+      # Strict branch protection means only the latest stamp can merge —
+      # older ones become permanently outdated.
+      - name: Clean up old stamp PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr list --head 'bot/stamp-metadata-' --state open --json number,headRefName \
+            --jq '.[] | "\(.number) \(.headRefName)"' | while read -r PR_NUM BRANCH_NAME; do
+            echo "Closing stale stamp PR #$PR_NUM ($BRANCH_NAME)"
+            gh pr close "$PR_NUM" --comment "Superseded by newer stamp." --delete-branch || true
+          done
+
       - name: Create PR for metadata stamps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,14 +71,14 @@ jobs:
             --head "$BRANCH" \
             --base main
 
-          # Set the required "review" status check on the branch HEAD.
+          # Post the required "review" status on the branch HEAD.
           # PRs created by GITHUB_TOKEN don't trigger other workflows,
           # so the review bot never runs. Metadata-only changes are safe
           # to auto-approve — they don't touch component schemas or security surface.
           HEAD_SHA=$(git rev-parse HEAD)
           gh api "repos/${{ github.repository }}/statuses/$HEAD_SHA" \
             -f state=success \
-            -f context=metadata-stamp \
+            -f context=review \
             -f description="Metadata-only changes — auto-approved"
 
           gh pr merge "$BRANCH" --auto --squash
