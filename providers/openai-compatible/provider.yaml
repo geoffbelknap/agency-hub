@@ -1,0 +1,14 @@
+name: openai-compatible
+display_name: OpenAI-Compatible
+description: LiteLLM, OpenRouter, Azure Foundry, AWS Bedrock, and other OpenAI-compatible APIs
+category: compatible
+credential:
+  name: custom-llm-api-key
+  label: API Key
+  env_var: CUSTOM_LLM_API_KEY
+routing:
+  api_base_configurable: true
+  auth_header: Authorization
+  auth_prefix: "Bearer "
+  models: {}
+  tiers: {}
