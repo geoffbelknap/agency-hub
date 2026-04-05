@@ -1,0 +1,100 @@
+name: Publish OCI Artifacts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'connectors/**'
+      - 'packs/**'
+      - 'presets/**'
+      - 'missions/**'
+      - 'skills/**'
+      - 'services/**'
+      - 'providers/**'
+      - 'ontology/**'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io/geoffbelknap/agency-hub
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Install ORAS
+        run: |
+          ORAS_VERSION="1.2.0"
+          curl -sLO "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz"
+          tar xzf "oras_${ORAS_VERSION}_linux_amd64.tar.gz" oras
+          sudo mv oras /usr/local/bin/
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Detect changed components
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '^(connectors|packs|presets|missions|skills|services|providers|ontology)/' | sort -u)
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Publish changed components
+        if: steps.changes.outputs.files != ''
+        run: |
+          echo "${{ steps.changes.outputs.files }}" | while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            [[ "$file" == */metadata.yaml ]] && continue
+            [[ "$file" == */README.md ]] && continue
+            [[ "$file" != *.yaml ]] && continue
+            [[ "$(basename "$file")" == "metadata.yaml" ]] && continue
+
+            KIND_PLURAL=$(echo "$file" | cut -d/ -f1)
+            NAME=$(echo "$file" | cut -d/ -f2)
+            KIND="${KIND_PLURAL%s}"
+
+            COMPONENT_FILE="$file"
+            METADATA_FILE="$(dirname "$file")/metadata.yaml"
+
+            VERSION=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('$COMPONENT_FILE')); print(d.get('version','0.0.0'))")
+
+            REF="${{ env.REGISTRY }}/${KIND}/${NAME}:${VERSION}"
+
+            echo "Publishing ${KIND}/${NAME}:${VERSION}..."
+
+            PUSH_ARGS=(
+              "$COMPONENT_FILE:application/vnd.agency.hub.component.v1+yaml"
+            )
+            if [ -f "$METADATA_FILE" ]; then
+              PUSH_ARGS+=("$METADATA_FILE:application/vnd.agency.hub.metadata.v1+yaml")
+            fi
+
+            oras push "$REF" \
+              --annotation "org.opencontainers.image.version=$VERSION" \
+              --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --annotation "org.opencontainers.image.revision=${{ github.sha }}" \
+              --annotation "agency.hub.kind=$KIND" \
+              "${PUSH_ARGS[@]}"
+
+            oras tag "$REF" latest
+
+            cosign sign --yes "$REF"
+
+            echo "Published and signed ${KIND}/${NAME}:${VERSION}"
+          done
+
+      - name: Summary
+        if: steps.changes.outputs.files != ''
+        run: echo "### OCI artifacts published to ghcr.io" >> "$GITHUB_STEP_SUMMARY"
