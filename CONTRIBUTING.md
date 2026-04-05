@@ -349,3 +349,20 @@ Your hub repo follows the same directory structure. Add a review bot workflow fo
 - Components must not inject instructions into agents via graph_ingest (XPIA)
 - Components must declare all credential requirements honestly
 - Components must be useful — no placeholder or spam submissions
+
+## How Components Are Published
+
+When your PR is merged to main, components are automatically:
+
+1. **Metadata stamped** — version, build hash, and timestamp added to `metadata.yaml`
+2. **Published to GHCR** — pushed as OCI artifacts to `ghcr.io/geoffbelknap/agency-hub/{kind}/{name}:{version}`
+3. **Signed** — cosign keyless signing with GitHub Actions OIDC identity
+
+You don't need to interact with the OCI registry directly. Just submit your YAML, pass review, and CI handles distribution.
+
+Users install your component with:
+
+```bash
+agency hub update
+agency hub install <name>
+```
