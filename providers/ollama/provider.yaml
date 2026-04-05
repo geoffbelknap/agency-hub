@@ -8,5 +8,5 @@ routing:
   api_base_configurable: true
   auth_header: null
   auth_prefix: ""
-  models: {}
+  models: {}  # Operator defines models; include capabilities: [tools, streaming] per model
   tiers: {}
