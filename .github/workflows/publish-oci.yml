@@ -12,6 +12,8 @@ on:
       - 'services/**'
       - 'providers/**'
       - 'ontology/**'
+      - 'setup/**'
+      - 'scripts/build_oci_index.py'
 
 permissions:
   contents: read
@@ -43,41 +45,20 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Detect changed components
-        id: changes
+      - name: Build OCI catalog index
+        run: python3 scripts/build_oci_index.py --registry "${{ env.REGISTRY }}"
+
+      - name: Publish components
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '^(connectors|packs|presets|missions|skills|services|providers|ontology)/' | sort -u)
-          echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CHANGED" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          while IFS=$'\t' read -r KIND NAME VERSION REF COMPONENT_FILE METADATA_FILE; do
+            [ -z "$KIND" ] && continue
 
-      - name: Publish changed components
-        if: steps.changes.outputs.files != ''
-        run: |
-          echo "${{ steps.changes.outputs.files }}" | while IFS= read -r file; do
-            [ -z "$file" ] && continue
-            [[ "$file" == */metadata.yaml ]] && continue
-            [[ "$file" == */README.md ]] && continue
-            [[ "$file" != *.yaml ]] && continue
-            [[ "$(basename "$file")" == "metadata.yaml" ]] && continue
-
-            KIND_PLURAL=$(echo "$file" | cut -d/ -f1)
-            NAME=$(echo "$file" | cut -d/ -f2)
-            KIND="${KIND_PLURAL%s}"
-
-            COMPONENT_FILE="$file"
-            METADATA_FILE="$(dirname "$file")/metadata.yaml"
-
-            VERSION=$(python3 -c "import yaml,sys; d=yaml.safe_load(open('$COMPONENT_FILE')); print(d.get('version','0.0.0'))")
-
-            REF="${{ env.REGISTRY }}/${KIND}/${NAME}:${VERSION}"
-
-            echo "Publishing ${KIND}/${NAME}:${VERSION}..."
+            echo "Publishing ${KIND}/${NAME}:${VERSION} (${COMPONENT_FILE})..."
 
             PUSH_ARGS=(
               "$COMPONENT_FILE:application/vnd.agency.hub.component.v1+yaml"
             )
-            if [ -f "$METADATA_FILE" ]; then
+            if [ -n "$METADATA_FILE" ] && [ -f "$METADATA_FILE" ]; then
               PUSH_ARGS+=("$METADATA_FILE:application/vnd.agency.hub.metadata.v1+yaml")
             fi
 
@@ -93,8 +74,22 @@ jobs:
             cosign sign --yes "$REF"
 
             echo "Published and signed ${KIND}/${NAME}:${VERSION}"
-          done
+          done < oci-publish-list.tsv
+
+      - name: Publish catalog index
+        run: |
+          REF="${{ env.REGISTRY }}/index/catalog:${{ github.sha }}"
+          oras push "$REF" \
+            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "org.opencontainers.image.revision=${{ github.sha }}" \
+            --annotation "agency.hub.kind=index" \
+            "oci-index.yaml:application/vnd.agency.hub.index.v1+yaml"
+
+          oras tag "$REF" latest
+
+          cosign sign --yes "$REF"
+
+          echo "Published and signed catalog index"
 
       - name: Summary
-        if: steps.changes.outputs.files != ''
         run: echo "### OCI artifacts published to ghcr.io" >> "$GITHUB_STEP_SUMMARY"
