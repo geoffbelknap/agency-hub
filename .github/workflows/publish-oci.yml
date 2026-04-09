@@ -13,6 +13,9 @@ on:
       - 'providers/**'
       - 'ontology/**'
       - 'setup/**'
+      - 'policies/**'
+      - 'workspaces/**'
+      - 'pricing/**'
       - 'scripts/build_oci_index.py'
 
 permissions:
@@ -50,13 +53,17 @@ jobs:
 
       - name: Publish components
         run: |
-          while IFS=$'\t' read -r KIND NAME VERSION REF COMPONENT_FILE METADATA_FILE; do
+          while IFS=$'\t' read -r KIND NAME VERSION REF COMPONENT_FILE METADATA_FILE MEDIA_TYPE; do
             [ -z "$KIND" ] && continue
 
             echo "Publishing ${KIND}/${NAME}:${VERSION} (${COMPONENT_FILE})..."
 
+            if [ -z "$MEDIA_TYPE" ]; then
+              MEDIA_TYPE="application/vnd.agency.hub.component.v1+yaml"
+            fi
+
             PUSH_ARGS=(
-              "$COMPONENT_FILE:application/vnd.agency.hub.component.v1+yaml"
+              "$COMPONENT_FILE:$MEDIA_TYPE"
             )
             if [ -n "$METADATA_FILE" ] && [ -f "$METADATA_FILE" ]; then
               PUSH_ARGS+=("$METADATA_FILE:application/vnd.agency.hub.metadata.v1+yaml")

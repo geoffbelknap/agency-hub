@@ -13,14 +13,19 @@ from pathlib import Path
 import re
 
 
+DEFAULT_COMPONENT_MEDIA_TYPE = "application/vnd.agency.hub.component.v1+yaml"
+
 COMPONENT_DIRS = {
-    "connectors": "connector",
-    "packs": "pack",
-    "presets": "preset",
-    "missions": "mission",
-    "services": "service",
-    "providers": "provider",
-    "setup": "setup",
+    "connectors": ("connector", "connector.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "packs": ("pack", "pack.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "presets": ("preset", "preset.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "missions": ("mission", "mission.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "services": ("service", "service.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "providers": ("provider", "provider.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "setup": ("setup", "setup.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "skills": ("skill", "SKILL.md", "application/vnd.agency.hub.skill.v1+markdown"),
+    "policies": ("policy", "policy.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
+    "workspaces": ("workspace", "workspace.yaml", DEFAULT_COMPONENT_MEDIA_TYPE),
 }
 
 SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*?)\s*$")
@@ -65,12 +70,12 @@ def component_version(values: dict[str, str]) -> str:
 def discover_components(root: Path, registry: str) -> list[dict[str, str]]:
     components: list[dict[str, str]] = []
 
-    for plural, kind in COMPONENT_DIRS.items():
+    for plural, (kind, filename, media_type) in COMPONENT_DIRS.items():
         kind_root = root / plural
         if not kind_root.is_dir():
             continue
         for component_dir in sorted(p for p in kind_root.iterdir() if p.is_dir()):
-            component_file = component_dir / f"{kind}.yaml"
+            component_file = component_dir / filename
             if not component_file.exists():
                 continue
             values = read_top_level_scalars(component_file)
@@ -83,10 +88,27 @@ def discover_components(root: Path, registry: str) -> list[dict[str, str]]:
                 "version": version,
                 "ref": f"{registry}/{kind}/{name}:{version}",
                 "path": component_file.relative_to(root).as_posix(),
+                "media_type": media_type,
             }
             if metadata_file.exists():
                 entry["metadata_path"] = metadata_file.relative_to(root).as_posix()
             components.append(entry)
+
+    routing_file = root / "pricing" / "routing.yaml"
+    if routing_file.exists():
+        values = read_top_level_scalars(routing_file)
+        name = component_name("routing", "routing", values)
+        version = component_version(values)
+        components.append(
+            {
+                "kind": "routing",
+                "name": name,
+                "version": version,
+                "ref": f"{registry}/routing/{name}:{version}",
+                "path": routing_file.relative_to(root).as_posix(),
+                "media_type": DEFAULT_COMPONENT_MEDIA_TYPE,
+            }
+        )
 
     ontology_root = root / "ontology"
     if ontology_root.is_dir():
@@ -101,6 +123,7 @@ def discover_components(root: Path, registry: str) -> list[dict[str, str]]:
                     "version": version,
                     "ref": f"{registry}/ontology/{name}:{version}",
                     "path": component_file.relative_to(root).as_posix(),
+                    "media_type": DEFAULT_COMPONENT_MEDIA_TYPE,
                 }
             )
 
@@ -123,6 +146,7 @@ def write_index(path: Path, registry: str, components: list[dict[str, str]]) -> 
                 f"    version: {quote_yaml(component['version'])}",
                 f"    ref: {quote_yaml(component['ref'])}",
                 f"    path: {quote_yaml(component['path'])}",
+                f"    media_type: {quote_yaml(component['media_type'])}",
             ]
         )
         if "metadata_path" in component:
@@ -142,6 +166,7 @@ def write_publish_list(path: Path, components: list[dict[str, str]]) -> None:
                     component["ref"],
                     component["path"],
                     component.get("metadata_path", ""),
+                    component["media_type"],
                 ]
             )
         )
