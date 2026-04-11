@@ -91,6 +91,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
       # Exit 2: security surface changed, needs human review
+      # This is advisory for now: signal clearly, but do not block merge.
       - name: Flag for human review
         if: steps.review.outputs.exit_code == '2'
         run: |
@@ -120,16 +121,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      # GATE: validation failures (exit 1) AND security surface changes (exit 2) block merge.
-      # Exit 2 requires explicit human approval via GitHub review before merging.
+      # GATE: only true validation failures (exit 1) block merge.
+      # Exit 2 is advisory so personal-repo PR flow stays lightweight while
+      # still signaling security-surface changes clearly.
       - name: Status check gate
-        if: steps.review.outputs.exit_code == '1' || steps.review.outputs.exit_code == '2'
+        if: steps.review.outputs.exit_code == '1'
         env:
           EXIT_CODE: ${{ steps.review.outputs.exit_code }}
         run: |
-          if [ "$EXIT_CODE" == "1" ]; then
-            echo "::error::Schema validation failed — fix errors before merging"
-            exit 1
-          fi
-          echo "::error::Security surface changes detected — requires human approval review before merging"
+          echo "::error::Schema validation failed — fix errors before merging"
           exit 1
