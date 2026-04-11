@@ -1,0 +1,29 @@
+name: community-vote-close
+description: Close expired nomination votes and summarize the outcome
+instructions: |
+  Periodically review open community nominations and determine whether any vote
+  window has closed.
+
+  For each nomination whose voting window has expired:
+  - summarize the recorded sponsorship and voting state
+  - determine the outcome from the configured policy and observed votes
+  - post the outcome and any required next step to community-admin-ops
+  - if the outcome implies a membership invitation or document-access update,
+    recommend or trigger the next administrative step according to deployment policy
+
+  Do not invent votes or sponsors. If required inputs are missing, report the
+  nomination as blocked rather than guessing.
+
+triggers:
+  - source: schedule
+    cron: "*/5 * * * *"
+
+requires:
+  channels:
+    - community-admin-ops
+
+budget:
+  per_task: 0.05
+  daily: 0.50
+
+cost_mode: frugal

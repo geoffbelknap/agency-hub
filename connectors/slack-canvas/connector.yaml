@@ -1,0 +1,57 @@
+kind: connector
+name: slack-canvas
+version: "1.0.0"
+description: >
+  Publishes durable Slack-native artifacts to Canvas. Tool-only connector
+  for creating and editing Canvas documents from Agency workflows.
+author: geoffbelknap
+license: Apache-2.0
+
+requires:
+  services:
+    - slack
+  egress_domains:
+    - slack.com
+
+source:
+  type: none
+
+routes: []
+
+mcp:
+  name: slack-canvas
+  credential: slack
+  api_base: "https://slack.com"
+  tools:
+    - name: slack_canvas_create
+      method: POST
+      path: /api/canvases.create
+      description: Create a Slack Canvas document.
+      parameters:
+        title:
+          type: string
+          description: Title for the new canvas
+        document_content:
+          type: object
+          description: Canvas document content payload
+        channel_id:
+          type: string
+          description: Optional channel ID to tab the canvas into
+
+    - name: slack_canvas_edit
+      method: POST
+      path: /api/canvases.edit
+      description: Edit an existing Slack Canvas document.
+      parameters:
+        canvas_id:
+          type: string
+          description: Slack canvas ID
+          required: true
+        changes:
+          type: array
+          description: Array of canvas edit operations
+          required: true
+
+rate_limits:
+  max_per_hour: 500
+  max_concurrent: 10

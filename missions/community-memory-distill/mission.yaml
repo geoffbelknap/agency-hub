@@ -1,0 +1,29 @@
+name: community-memory-distill
+description: Distill community discussion into durable administrative memory
+instructions: |
+  Periodically review recent community discussion and capture durable community
+  administration facts, decisions, and rule-relevant context.
+
+  Focus on:
+  - clarified community rules or procedures
+  - nomination and sponsorship context that should survive chat retention
+  - durable decisions about shared resources or access policy
+  - frequently repeated member questions about how the community works
+
+  Summarize what changed and post a brief memory-distillation note to
+  community-admin-ops. Exclude content that is clearly outside the community's
+  own administrative context.
+
+triggers:
+  - source: schedule
+    cron: "0 */4 * * *"
+
+requires:
+  channels:
+    - community-admin-ops
+
+budget:
+  per_task: 0.08
+  daily: 0.60
+
+cost_mode: frugal

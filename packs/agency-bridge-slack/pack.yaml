@@ -1,0 +1,36 @@
+kind: pack
+name: agency-bridge-slack
+version: "0.1.0"
+description: >
+  Foundational Slack bridge pack that makes Slack a first-class Agency
+  conversation client. Uses Slack messaging primitives to host Agency
+  conversations inside Slack-native DMs and channel threads.
+author: geoffbelknap
+license: Apache-2.0
+
+requires:
+  connectors:
+    - slack-events
+    - agency-bridge-slack-events-outbound
+  presets:
+    - platform-expert
+  services:
+    - slack
+
+team:
+  name: agency-bridge-slack
+  agents:
+    - name: slack-bridge
+      preset: platform-expert
+      role: coordinator
+      connectors:
+        - slack-events
+      skills: []
+
+  channels:
+    - name: bridge-ops
+      topic: Internal coordination and audit context for the Slack bridge
+      private: true
+    - name: slack-events
+      topic: Bridge relay channel for Slack Events API conversations
+      private: true
