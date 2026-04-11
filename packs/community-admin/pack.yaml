@@ -1,0 +1,47 @@
+kind: pack
+name: community-admin
+version: "0.1.0"
+description: >
+  Private community administration pack for Slack-based, invite-gated groups.
+  Handles nomination flow, community memory, and managed-document access
+  coordination with explicit auditability.
+author: geoffbelknap
+license: Apache-2.0
+
+requires:
+  connectors:
+    - slack-events
+    - slack-interactivity
+    - google-drive-admin
+  presets:
+    - community-administrator
+  services:
+    - slack
+
+team:
+  name: community-admin
+  agents:
+    - name: admin-coordinator
+      preset: community-administrator
+      role: coordinator
+      connectors:
+        - slack-events
+        - slack-interactivity
+        - google-drive-admin
+      skills: []
+
+  channels:
+    - name: community-admin-ops
+      topic: Internal operations and audit channel for the community administrator
+      private: true
+
+recommended_connectors:
+  - slack-admin
+
+mission_assignments:
+  - mission: community-vote-close
+    agent: admin-coordinator
+  - mission: community-memory-distill
+    agent: admin-coordinator
+  - mission: community-access-sync
+    agent: admin-coordinator

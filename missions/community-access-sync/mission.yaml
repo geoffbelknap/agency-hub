@@ -1,0 +1,29 @@
+name: community-access-sync
+description: Reconcile approved membership with managed Google Drive access
+instructions: |
+  Reconcile the approved community roster against permissions on the managed
+  Google Drive resources.
+
+  For each managed resource:
+  - list current permissions
+  - compare them against the approved member roster and any configured sponsor/admin rules
+  - identify drift that should be corrected
+  - post a concise sync report to community-admin-ops
+
+  Only apply access changes when the deployment policy allows it and the
+  required authority is available. Otherwise, recommend the exact changes for
+  human review.
+
+triggers:
+  - source: schedule
+    cron: "0 2 * * *"
+
+requires:
+  channels:
+    - community-admin-ops
+
+budget:
+  per_task: 0.08
+  daily: 0.30
+
+cost_mode: frugal

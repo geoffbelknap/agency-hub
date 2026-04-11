@@ -1,0 +1,162 @@
+kind: connector
+name: google-drive-admin
+version: "1.0.0"
+description: >
+  Bounded Google Drive administration connector for managing sharing on
+  explicitly approved files and folders. Tool-only connector with service
+  account authentication and a narrow Drive permissions surface.
+author: geoffbelknap
+license: Apache-2.0
+
+requires:
+  credentials:
+    - name: google-drive-admin
+      description: Google service account credential for Drive administration
+      type: secret
+      scope: service-grant
+      grant_name: google-drive-admin
+      setup_url: "https://console.cloud.google.com/iam-admin/serviceaccounts"
+  egress_domains:
+    - www.googleapis.com
+    - oauth2.googleapis.com
+
+source:
+  type: none
+
+routes: []
+
+mcp:
+  name: google-drive-admin
+  credential: google-drive-admin
+  api_base: "https://www.googleapis.com"
+  tools:
+    - name: drive_share_file
+      method: POST
+      path: /drive/v3/files/{file_id}/permissions
+      description: Create a permission on a Drive file.
+      parameters:
+        file_id:
+          type: string
+          description: Google Drive file ID
+          required: true
+        role:
+          type: string
+          description: Drive permission role such as reader, commenter, or writer
+          required: true
+        type:
+          type: string
+          description: Permission type such as user or group
+          required: true
+        emailAddress:
+          type: string
+          description: Target email for user or group permissions
+        sendNotificationEmail:
+          type: boolean
+          description: Whether Drive should send its standard share email
+
+    - name: drive_share_folder
+      method: POST
+      path: /drive/v3/files/{folder_id}/permissions
+      description: Create a permission on a Drive folder.
+      parameters:
+        folder_id:
+          type: string
+          description: Google Drive folder ID
+          required: true
+        role:
+          type: string
+          description: Drive permission role such as reader, commenter, or writer
+          required: true
+        type:
+          type: string
+          description: Permission type such as user or group
+          required: true
+        emailAddress:
+          type: string
+          description: Target email for user or group permissions
+        sendNotificationEmail:
+          type: boolean
+          description: Whether Drive should send its standard share email
+
+    - name: drive_list_file_permissions
+      method: GET
+      path: /drive/v3/files/{file_id}/permissions
+      description: List current permissions on a Drive file.
+      parameters:
+        file_id:
+          type: string
+          description: Google Drive file ID
+          required: true
+        fields:
+          type: string
+          description: Optional partial response selector
+
+    - name: drive_list_folder_permissions
+      method: GET
+      path: /drive/v3/files/{folder_id}/permissions
+      description: List current permissions on a Drive folder.
+      parameters:
+        folder_id:
+          type: string
+          description: Google Drive folder ID
+          required: true
+        fields:
+          type: string
+          description: Optional partial response selector
+
+    - name: drive_remove_file_permission
+      method: DELETE
+      path: /drive/v3/files/{file_id}/permissions/{permission_id}
+      description: Remove a specific permission from a Drive file.
+      parameters:
+        file_id:
+          type: string
+          description: Google Drive file ID
+          required: true
+        permission_id:
+          type: string
+          description: Permission ID to remove
+          required: true
+
+    - name: drive_remove_folder_permission
+      method: DELETE
+      path: /drive/v3/files/{folder_id}/permissions/{permission_id}
+      description: Remove a specific permission from a Drive folder.
+      parameters:
+        folder_id:
+          type: string
+          description: Google Drive folder ID
+          required: true
+        permission_id:
+          type: string
+          description: Permission ID to remove
+          required: true
+
+    - name: drive_list_folder_contents
+      method: GET
+      path: /drive/v3/files
+      description: List the immediate children of a Drive folder.
+      parameters:
+        q:
+          type: string
+          description: Drive query string, typically parents in '<folder_id>' and trashed=false
+          required: true
+        pageSize:
+          type: integer
+          description: Optional page size
+        pageToken:
+          type: string
+          description: Optional next page token
+        fields:
+          type: string
+          description: Optional partial response selector
+        includeItemsFromAllDrives:
+          type: boolean
+          description: Include shared drive items
+        supportsAllDrives:
+          type: boolean
+          description: Enable shared drive support
+
+rate_limits:
+  max_per_hour: 600
+  max_concurrent: 10

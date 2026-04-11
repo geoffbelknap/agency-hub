@@ -3,8 +3,8 @@ name: slack-events
 version: "1.0.0"
 description: >
   Receives Slack Events API webhooks for real-time message delivery.
-  Unlike slack-ops (which polls), this receives events immediately via
-  push — no polling delay, no duplicate detection needed, scales cleanly.
+  Receives events immediately via push — no polling delay, no duplicate
+  detection needed, scales cleanly.
 
   Requires:
     - A public HTTPS endpoint pointing to this intake server
@@ -25,6 +25,11 @@ requires:
 
 source:
   type: webhook
+  path: /webhooks/slack-events
+  body_format: json
+  response_status: 200
+  response_body: ""
+  response_content_type: text/plain
   webhook_auth:
     type: hmac_sha256
     secret_env: SLACK_SIGNING_SECRET
@@ -36,12 +41,13 @@ source:
 routes:
   # Route @mentions of your bot to the target agent
   - match:
-      type: message
-      bot_id: null
-      subtype: null
-      text: "re:<@U0YOURBOTUSERID>"
+      type: event_callback
+      event.type: message
+      event.bot_id: null
+      event.subtype: null
+      event.text: "re:<@U0YOURBOTUSERID>"
     target:
-      agent: slack-agent
+      agent: slack-bridge
     brief: >
       A Slack message mentioning the bot.
       From user: {{ event.user }}
@@ -55,15 +61,13 @@ routes:
 
   # Route urgent messages with high priority
   - match:
-      type: message
-      bot_id: null
-      subtype: null
-      text:
-        - "urgent"
-        - "incident"
-        - "outage"
+      type: event_callback
+      event.type: message
+      event.bot_id: null
+      event.subtype: null
+      event.text: "re:(?i)\\b(urgent|incident|outage)\\b"
     target:
-      agent: slack-agent
+      agent: slack-bridge
     brief: >
       Urgent Slack message: {{ event.text }}
       From: {{ event.user }} in {{ event.channel }}

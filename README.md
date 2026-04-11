@@ -74,8 +74,9 @@ agency hub publish <path>              # submit PR to source
 
 | Name | Description |
 |------|-------------|
+| `agency-bridge-slack` | Foundational Slack-native Agency conversation bridge |
+| `community-admin` | Private community administration for Slack communities and managed documents |
 | `security-ops` | Phase 1 security operations — alert triage (Haiku) + environment explorer (Sonnet) |
-| `slack-ops` | Slack channel monitoring — polls channels, routes by pattern |
 | `jira-ops` | Jira queue management — polls issues, routes by type/priority |
 | `red-team` | Authorized security testing coordination |
 
@@ -90,8 +91,17 @@ agency hub publish <path>              # submit PR to source
 | `unifi` | poll | UniFi infrastructure devices (graph-only) |
 | `unifi-hosts` | poll | UniFi console inventory (graph-only) |
 | `unifi-sites` | poll | UniFi site topology (graph-only) |
-| `slack-ops` | poll | Slack channel polling |
+| `slack-admin` | none | Privileged Slack admin operations |
+| `slack-app-home` | none | Slack App Home publishing |
+| `slack-canvas` | none | Slack Canvas publishing |
+| `slack-commands` | webhook | Slack slash command ingress |
 | `slack-events` | webhook | Slack Events API real-time |
+| `slack-interactivity` | webhook | Slack interactivity and modal lifecycle |
+| `agency-bridge-slack-events-outbound` | channel-watch | Relay Slack Events replies back to Slack |
+| `agency-bridge-slack-interactivity-outbound` | channel-watch | Relay Slack interactivity replies back to Slack |
+| `agency-bridge-slack-commands-outbound` | channel-watch | Relay Slack slash command replies back to Slack |
+| `agency-bridge-slack-outbound` | channel-watch | Relay Slack-originated replies back to Slack |
+| `google-drive-admin` | none | Bounded Google Drive sharing and permission administration |
 | `jira-ops` | poll | Jira issue polling |
 | `comms-to-slack` | channel-watch | Mirror comms to Slack |
 
@@ -113,6 +123,7 @@ agency hub publish <path>              # submit PR to source
 |------|------|-------------|
 | `security-triage` | fast | Autonomous alert assessment |
 | `security-explorer` | standard | Scheduled environment enrichment |
+| `community-administrator` | standard | Governance and access coordination for private communities |
 
 ### Missions
 
@@ -120,6 +131,9 @@ agency hub publish <path>              # submit PR to source
 |------|---------|-------------|
 | `alert-triage` | LC connector | Triage security alerts, post to findings |
 | `security-explorer-mission` | Cron (6h) | Enrich knowledge graph with environment context |
+| `community-vote-close` | Cron (5m) | Close community votes and summarize outcomes |
+| `community-memory-distill` | Cron (4h) | Distill durable administrative memory from discussion |
+| `community-access-sync` | Cron (daily) | Reconcile approved membership and managed access |
 
 ## Hub-Managed Files
 

@@ -35,7 +35,7 @@ routes:
         Content-Type: application/json
       body: >
         {"channel": "${SLACK_ESCALATION_CHANNEL_ID}",
-         "text": ":rotating_light: *[red-team escalation]* *{{ sender }}*: {{ content }}",
+         "text": ":rotating_light: *[red-team escalation]* *{{ author }}*: {{ content }}",
          "unfurl_links": false}
 
 rate_limits:
