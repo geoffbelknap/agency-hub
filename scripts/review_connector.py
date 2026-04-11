@@ -388,7 +388,7 @@ def get_changed_component_files(base: str, head: str) -> list[str]:
     for f in files:
         if not f.endswith(".yaml"):
             continue
-        if f.startswith("connectors/"):
+        if f.startswith("connectors/") and f.endswith("/connector.yaml"):
             changed.append(f)
         elif f.startswith("presets/") and f.endswith("/preset.yaml"):
             changed.append(f)

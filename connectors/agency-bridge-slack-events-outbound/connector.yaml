@@ -26,7 +26,7 @@ routes:
         Content-Type: application/json
       body: >
         {"channel": "{{ metadata.bridge.channel_id }}",
-         "text": "*{{ author }}*: {{ content }}{% if metadata.has_artifact %}\n\nAttachment: {{ metadata.attachment_id }}{% endif %}",
+         "text": "*{{ author }}*: {{ content }}",
          "thread_ts": "{{ metadata.bridge.thread_ts }}",
          "unfurl_links": false}
 
