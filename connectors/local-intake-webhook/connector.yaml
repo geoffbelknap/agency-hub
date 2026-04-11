@@ -1,0 +1,27 @@
+kind: connector
+name: local-intake-webhook
+version: "0.1.0"
+description: >
+  Local webhook connector for deterministic operator validation.
+  This is intended for local and CI-style stack checks where Agency should prove
+  the end-to-end intake path without external systems or credentials.
+author: geoffbelknap
+license: Apache-2.0
+
+config:
+  - name: target_agent
+    description: Agent that should receive the routed work item
+    required: true
+
+source:
+  type: webhook
+
+routes:
+  - match:
+      kind: local-intake-check
+    target:
+      agent: ${target_agent}
+
+rate_limits:
+  max_per_hour: 120
+  max_concurrent: 5
