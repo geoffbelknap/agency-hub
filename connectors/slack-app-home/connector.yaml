@@ -1,0 +1,46 @@
+kind: connector
+name: slack-app-home
+version: "1.0.0"
+description: >
+  Publishes and refreshes Slack App Home views for Agency-driven inboxes,
+  status panels, and dashboards. Tool-only connector with no inbound
+  intake surface.
+author: geoffbelknap
+license: Apache-2.0
+
+requires:
+  services:
+    - slack
+  egress_domains:
+    - slack.com
+
+source:
+  type: none
+
+routes: []
+
+mcp:
+  name: slack-app-home
+  credential: slack
+  api_base: "https://slack.com"
+  tools:
+    - name: slack_app_home_publish
+      method: POST
+      path: /api/views.publish
+      description: Publish a Home tab view for a Slack user.
+      parameters:
+        user_id:
+          type: string
+          description: Slack user ID
+          required: true
+        view:
+          type: object
+          description: Slack Home tab view payload
+          required: true
+        hash:
+          type: string
+          description: Optional optimistic concurrency hash
+
+rate_limits:
+  max_per_hour: 1000
+  max_concurrent: 10

@@ -1,0 +1,75 @@
+kind: connector
+name: slack-admin
+version: "1.0.0"
+description: >
+  Privileged Slack admin connector for workspace invites and user-group
+  operations that require stronger scopes than ordinary messaging flows.
+  Tool-only connector with explicit high-authority boundaries.
+author: geoffbelknap
+license: Apache-2.0
+
+requires:
+  credentials:
+    - name: slack-admin
+      description: Slack admin-scoped token for privileged workspace operations
+      type: secret
+      scope: service-grant
+      grant_name: slack-admin
+      setup_url: "https://api.slack.com/apps"
+  egress_domains:
+    - slack.com
+
+source:
+  type: none
+
+routes: []
+
+mcp:
+  name: slack-admin
+  credential: slack-admin
+  api_base: "https://slack.com"
+  tools:
+    - name: slack_admin_users_invite
+      method: POST
+      path: /api/admin.users.invite
+      description: Invite a user to a Slack workspace.
+      parameters:
+        team_id:
+          type: string
+          description: Slack workspace ID
+          required: true
+        email:
+          type: string
+          description: Email address to invite
+          required: true
+        channel_ids:
+          type: string
+          description: Comma-separated Slack channel IDs
+          required: true
+        custom_message:
+          type: string
+          description: Optional invite message
+        real_name:
+          type: string
+          description: Optional full name
+
+    - name: slack_usergroup_users_update
+      method: POST
+      path: /api/usergroups.users.update
+      description: Replace the user list for a Slack user group.
+      parameters:
+        usergroup:
+          type: string
+          description: Slack user group ID
+          required: true
+        users:
+          type: array
+          description: Full user ID list for the group
+          required: true
+        include_count:
+          type: boolean
+          description: Include user count in response
+
+rate_limits:
+  max_per_hour: 500
+  max_concurrent: 5

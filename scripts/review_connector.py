@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Hub review bot — validates connector PRs and decides auto-approve vs flag.
+"""Hub review bot — validates component PRs and decides auto-approve vs flag.
 
-Reads changed connector YAML files from a PR diff, validates schema,
+Reads changed component YAML files from a PR diff, validates schema,
 and checks whether changes expand the security surface.
 
 Exit codes:
@@ -31,12 +31,14 @@ import yaml
 # ---------------------------------------------------------------------------
 
 REQUIRED_TOP_LEVEL = {"kind", "name", "version", "source"}
-VALID_SOURCE_TYPES = {"webhook", "poll", "schedule", "channel-watch"}
+VALID_SOURCE_TYPES = {"webhook", "poll", "schedule", "channel-watch", "none"}
+VALID_WEBHOOK_BODY_FORMATS = {"json", "form_urlencoded", "form_urlencoded_payload_json_field"}
 VALID_PRIORITIES = {"high", "normal", "low"}
 SECURITY_SURFACE_FIELDS = {"requires", "mcp"}
 
 REQUIRED_PRESET_FIELDS = {"name", "description", "type"}
 REQUIRED_PACK_FIELDS = {"name", "description"}
+REQUIRED_MISSION_FIELDS = {"name", "description", "instructions"}
 
 SUSPICIOUS_IDENTITY_PATTERNS = [
     r"ignore\s+previous",
@@ -87,6 +89,28 @@ def validate_connector(data: dict, path: str) -> list[str]:
         if not source.get("interval") and not source.get("cron"):
             errors.append(f"{path}: poll source requires 'interval' or 'cron'")
 
+    if source.get("type") == "none" and data.get("routes"):
+        errors.append(f"{path}: none source connectors cannot define routes")
+
+    body_format = source.get("body_format")
+    payload_field = source.get("payload_field")
+    webhook_path = source.get("path")
+    response_status = source.get("response_status")
+
+    if source.get("type") == "webhook":
+        if webhook_path is not None and (not isinstance(webhook_path, str) or not webhook_path.startswith("/")):
+            errors.append(f"{path}: webhook source.path must start with '/'")
+        if body_format is not None and body_format not in VALID_WEBHOOK_BODY_FORMATS:
+            errors.append(f"{path}: webhook source.body_format must be one of {VALID_WEBHOOK_BODY_FORMATS}")
+        if payload_field is not None and body_format != "form_urlencoded_payload_json_field":
+            errors.append(
+                f"{path}: source.payload_field requires body_format 'form_urlencoded_payload_json_field'"
+            )
+        if response_status is not None and (not isinstance(response_status, int) or response_status < 200 or response_status > 299):
+            errors.append(f"{path}: webhook source.response_status must be a 2xx integer")
+    elif webhook_path is not None or body_format is not None or payload_field is not None or response_status is not None or source.get("response_body") is not None or source.get("response_content_type") is not None:
+        errors.append(f"{path}: only webhook sources may define path, body_format, payload_field, or response fields")
+
     # Routes
     for i, route in enumerate(data.get("routes", [])):
         if "match" not in route:
@@ -112,6 +136,9 @@ def validate_connector(data: dict, path: str) -> list[str]:
         for i, tool in enumerate(mcp.get("tools", [])):
             if "name" not in tool:
                 errors.append(f"{path}: mcp.tools[{i}] missing 'name'")
+
+    if not data.get("routes") and not data.get("graph_ingest") and not mcp:
+        errors.append(f"{path}: connector must define at least one route, graph_ingest rule, or MCP tool")
 
     # Template safety — check for dunder access attempts
     _check_templates_recursive(data, path, errors)
@@ -196,7 +223,7 @@ def validate_pack(data: dict, path: str, known_connector_names: set) -> tuple:
     _check_templates_recursive(data, path, errors)
 
     # Check that referenced connectors exist in the hub
-    for ref in data.get("connectors", []):
+    for ref in data.get("requires", {}).get("connectors", []):
         connector_name = ref if isinstance(ref, str) else ref.get("name", "")
         if connector_name and connector_name not in known_connector_names:
             warnings.append(
@@ -205,6 +232,23 @@ def validate_pack(data: dict, path: str, known_connector_names: set) -> tuple:
             )
 
     return errors, warnings
+
+
+# ---------------------------------------------------------------------------
+# Mission validation
+# ---------------------------------------------------------------------------
+
+def validate_mission(data: dict, path: str) -> list[str]:
+    """Validate a mission YAML. Returns list of hard validation errors."""
+    errors = []
+
+    for field in REQUIRED_MISSION_FIELDS:
+        if field not in data:
+            errors.append(f"{path}: missing required field '{field}'")
+
+    _check_templates_recursive(data, path, errors)
+
+    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +378,7 @@ def _extract_tool_defs(data: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 def get_changed_component_files(base: str, head: str) -> list[str]:
-    """Get list of changed connector, preset, and pack YAML files between base and head."""
+    """Get list of changed connector, preset, mission, and pack YAML files between base and head."""
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{base}...{head}"],
         capture_output=True, text=True,
@@ -347,6 +391,8 @@ def get_changed_component_files(base: str, head: str) -> list[str]:
         if f.startswith("connectors/"):
             changed.append(f)
         elif f.startswith("presets/") and f.endswith("/preset.yaml"):
+            changed.append(f)
+        elif f.startswith("missions/") and f.endswith("/mission.yaml"):
             changed.append(f)
         elif f.startswith("packs/") and f.endswith("/pack.yaml"):
             changed.append(f)
@@ -377,7 +423,7 @@ def load_file_at_ref(ref: str, path: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Hub connector review bot")
+    parser = argparse.ArgumentParser(description="Hub component review bot")
     parser.add_argument("--base", default="main", help="Base branch/ref")
     parser.add_argument("--head", default="HEAD", help="Head branch/ref")
     parser.add_argument("--files", nargs="*", help="Specific files to validate (skip git diff)")
@@ -389,7 +435,7 @@ def main():
         changed_files = get_changed_component_files(args.base, args.head)
 
     if not changed_files:
-        print("No connector/preset/pack files changed.")
+        print("No connector/preset/mission/pack files changed.")
         sys.exit(0)
 
     known_connectors = _discover_known_connectors()
@@ -443,6 +489,16 @@ def main():
                 all_warnings.extend(warnings)
             elif not errors:
                 print(f"  Pack references: OK")
+            continue
+
+        if filepath.startswith("missions/"):
+            errors = validate_mission(new_data, filepath)
+            if errors:
+                for e in errors:
+                    print(f"  ERROR: {e}")
+                all_errors.extend(errors)
+            else:
+                print("  Schema: PASS")
             continue
 
         # --- connector ---
