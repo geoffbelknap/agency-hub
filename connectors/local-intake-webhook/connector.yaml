@@ -9,8 +9,8 @@ author: geoffbelknap
 license: Apache-2.0
 
 config:
-  - name: target_agent
-    description: Agent that should receive the routed work item
+  - name: target_channel
+    description: Channel that should receive the routed work item
     required: true
 
 source:
@@ -20,7 +20,7 @@ routes:
   - match:
       kind: local-intake-check
     target:
-      agent: ${target_agent}
+      channel: ${target_channel}
 
 rate_limits:
   max_per_hour: 120
