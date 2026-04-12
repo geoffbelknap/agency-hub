@@ -111,6 +111,7 @@ jobs:
             --result "$ASK_OUTCOME" \
             --review-scope package-change \
             --reviewer-type automated \
+            --assurance-dir assurance-statements \
             --output assurance-summary.json
 
       - name: Upload assurance summary
@@ -118,7 +119,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: assurance-summary
-          path: assurance-summary.json
+          path: |
+            assurance-summary.json
+            assurance-statements/
 
       # Exit 0: routine changes, auto-approve
       - name: Auto-approve

@@ -2,9 +2,16 @@ from pathlib import Path
 import tempfile
 import sys
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from write_assurance import build_statement, build_summary, artifact_from_component_file
+from write_assurance import (
+    artifact_from_component_file,
+    build_statement,
+    build_summary,
+    write_statements_tree,
+)
 
 
 def test_build_statement_for_partial_review():
@@ -48,3 +55,21 @@ def test_artifact_from_component_file_reads_kind_name_and_version():
         artifact = artifact_from_component_file(component)
 
     assert artifact == {"kind": "connector", "name": "google-drive-admin", "version": "1.1.0"}
+
+
+def test_write_statements_tree_writes_per_artifact_files():
+    with tempfile.TemporaryDirectory() as tmp:
+        stmt = build_statement(
+            artifact={"kind": "connector", "name": "google-drive-admin", "version": "1.1.0"},
+            result="ASK-Partial",
+            review_scope="package-change",
+            reviewer_type="automated",
+        )
+
+        write_statements_tree(Path(tmp), [stmt])
+
+        target = Path(tmp) / "connector" / "google-drive-admin" / "1.1.0.json"
+        doc = yaml.safe_load(target.read_text(encoding="utf-8"))
+
+    assert doc["artifact"]["name"] == "google-drive-admin"
+    assert doc["result"] == "ASK-Partial"

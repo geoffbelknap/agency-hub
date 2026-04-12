@@ -50,6 +50,14 @@ def artifact_from_component_file(path: Path) -> dict:
     }
 
 
+def write_statements_tree(root: Path, statements: list[dict]) -> None:
+    for statement in statements:
+        artifact = statement["artifact"]
+        target = root / artifact["kind"] / artifact["name"] / f'{artifact["version"]}.json'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(statement, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Write Agency Hub assurance statement")
     parser.add_argument("--artifact-kind")
@@ -60,6 +68,7 @@ def main() -> None:
     parser.add_argument("--review-scope", default="package-change")
     parser.add_argument("--reviewer-type", default="automated")
     parser.add_argument("--output", default="-")
+    parser.add_argument("--assurance-dir")
     args = parser.parse_args()
 
     artifacts = []
@@ -85,6 +94,9 @@ def main() -> None:
         )
         for artifact in artifacts
     ]
+
+    if args.assurance_dir:
+        write_statements_tree(Path(args.assurance_dir), statements)
 
     encoded = json.dumps(build_summary(statements), indent=2, sort_keys=True) + "\n"
     if args.output == "-":
