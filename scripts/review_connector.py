@@ -32,7 +32,12 @@ import yaml
 
 REQUIRED_TOP_LEVEL = {"kind", "name", "version", "source"}
 VALID_SOURCE_TYPES = {"webhook", "poll", "schedule", "channel-watch", "none"}
-VALID_WEBHOOK_BODY_FORMATS = {"json", "form_urlencoded", "form_urlencoded_payload_json_field"}
+VALID_WEBHOOK_BODY_FORMATS = {
+    "json",
+    "form_urlencoded",
+    "form_urlencoded_payload",
+    "form_urlencoded_payload_json_field",
+}
 VALID_PRIORITIES = {"high", "normal", "low"}
 SECURITY_SURFACE_FIELDS = {"requires", "mcp"}
 
@@ -59,6 +64,24 @@ def parse_version(v: str) -> tuple:
         return tuple(int(x) for x in str(v).split("."))
     except (ValueError, AttributeError):
         return (0, 0, 0)
+
+
+def load_publishers() -> dict[str, dict]:
+    publishers: dict[str, dict] = {}
+    root = Path("publishers")
+    if not root.exists():
+        return publishers
+    for path in root.glob("*.json"):
+        publishers[path.stem] = json.loads(path.read_text())
+    return publishers
+
+
+def determine_ask_outcome(errors: list[str], flags: list[str]) -> str:
+    if errors:
+        return "ASK-Fail"
+    if flags:
+        return "ASK-Partial"
+    return "ASK-Pass"
 
 
 def validate_connector(data: dict, path: str) -> list[str]:
@@ -439,6 +462,7 @@ def main():
         sys.exit(0)
 
     known_connectors = _discover_known_connectors()
+    load_publishers()
 
     all_errors = []
     all_flags = []
@@ -536,6 +560,12 @@ def main():
         print(f"BLOCKED: {len(all_errors)} validation error(s)")
         for e in all_errors:
             print(f"  - {e}")
+        print(json.dumps({
+            "ask_outcome": determine_ask_outcome(all_errors, all_flags),
+            "review_scope": "package-change",
+            "reviewer_type": "automated",
+            "policy_version": "2026-04-12",
+        }))
         sys.exit(1)
     elif all_flags:
         print(f"NEEDS HUMAN REVIEW: {len(all_flags)} security surface change(s)")
@@ -546,12 +576,24 @@ def main():
             with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
                 fh.write("needs_review=true\n")
                 fh.write(f"review_summary={json.dumps(all_flags)}\n")
+        print(json.dumps({
+            "ask_outcome": determine_ask_outcome(all_errors, all_flags),
+            "review_scope": "package-change",
+            "reviewer_type": "automated",
+            "policy_version": "2026-04-12",
+        }))
         sys.exit(2)
     else:
         print("AUTO-APPROVE: all changes are routine")
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
                 fh.write("needs_review=false\n")
+        print(json.dumps({
+            "ask_outcome": determine_ask_outcome(all_errors, all_flags),
+            "review_scope": "package-change",
+            "reviewer_type": "automated",
+            "policy_version": "2026-04-12",
+        }))
         sys.exit(0)
 
 

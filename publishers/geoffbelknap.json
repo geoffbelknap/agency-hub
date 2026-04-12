@@ -1,0 +1,10 @@
+{
+  "publisher_id": "user:geoffbelknap",
+  "kind": "individual",
+  "display_name": "Geoff Belknap",
+  "verification": {
+    "status": "verified",
+    "method": "github_repository_control",
+    "verified_at": "2026-04-12T00:00:00Z"
+  }
+}
