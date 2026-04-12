@@ -13,73 +13,82 @@ requires:
   services:
     - slack
   credentials:
-    - name: SLACK_SIGNING_SECRET
+    - name: slack_signing_secret
       description: Slack app signing secret for Interactivity & Shortcuts
       type: secret
-      scope: env-var
+      scope: service-grant
+    - name: slack_bot_token
+      description: Slack bot OAuth token used for modal view APIs
+      type: secret
+      scope: service-grant
       setup_url: "https://api.slack.com/apps"
   egress_domains:
     - slack.com
+  auth:
+    type: bearer
 
 source:
   type: webhook
   path: /webhooks/slack-interactivity
-  body_format: form_urlencoded_payload_json_field
-  payload_field: payload
-  response_status: 200
-  response_body: ""
-  response_content_type: text/plain
+  body_format: form_urlencoded_payload
+  ack_strategy: immediate_empty_200
   webhook_auth:
     type: hmac_sha256
-    secret_env: SLACK_SIGNING_SECRET
+    secret_credref: slack_signing_secret
     header: X-Slack-Signature
     timestamp_header: X-Slack-Request-Timestamp
     prefix: "v0="
 
+config:
+  interactivity_target_agent:
+    type: string
+    required: true
+    description: Agent that owns the deployment's Block Kit UX.
+
 routes:
   - match:
-      type: block_actions
+      payload_type: block_actions
     target:
-      agent: slack-bridge
+      agent: "${interactivity_target_agent}"
     brief: >
       Slack block action received from {{ user.id }}.
       Actions: {{ actions }}
 
   - match:
-      type: view_submission
+      payload_type: view_submission
     target:
-      agent: slack-bridge
+      agent: "${interactivity_target_agent}"
     brief: >
       Slack modal submission received from {{ user.id }}.
       Callback: {{ view.callback_id }}
 
   - match:
-      type: shortcut
+      payload_type: shortcut
     target:
-      agent: slack-bridge
+      agent: "${interactivity_target_agent}"
     brief: >
       Slack shortcut invoked by {{ user.id }}.
       Callback: {{ callback_id }}
 
   - match:
-      type: message_action
+      payload_type: message_action
     target:
-      agent: slack-bridge
+      agent: "${interactivity_target_agent}"
     brief: >
       Slack message action invoked by {{ user.id }}.
       Callback: {{ callback_id }}
 
   - match:
-      type: view_closed
+      payload_type: view_closed
     target:
-      agent: slack-bridge
+      agent: "${interactivity_target_agent}"
     brief: >
       Slack modal closed by {{ user.id }}.
       Callback: {{ view.callback_id }}
 
 mcp:
   name: slack-interactivity
-  credential: slack
+  credential: slack_bot_token
   api_base: "https://slack.com"
   tools:
     - name: slack_view_open
