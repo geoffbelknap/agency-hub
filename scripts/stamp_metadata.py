@@ -18,6 +18,20 @@ import yaml
 
 
 COMPONENT_DIRS = ["connectors", "packs", "presets", "ontology", "skills"]
+COMPONENT_FILES = {
+    "connectors": "connector.yaml",
+    "packs": "pack.yaml",
+    "presets": "preset.yaml",
+    "ontology": "ontology.yaml",
+    "skills": "skill.yaml",
+}
+COMPONENT_KINDS = {
+    "connectors": "connector",
+    "packs": "pack",
+    "presets": "preset",
+    "ontology": "ontology",
+    "skills": "skill",
+}
 
 
 def get_short_sha(ref: str) -> str:
@@ -30,14 +44,11 @@ def get_short_sha(ref: str) -> str:
 
 def stamp_component(component_dir: Path, ref: str, now: str):
     """Read component YAML and write/update metadata.yaml."""
-    # Find the main YAML file (connector.yaml, pack.yaml, preset.yaml, etc.)
-    main_yaml = None
-    for candidate in ["connector.yaml", "pack.yaml", "preset.yaml", "ontology.yaml", "skill.yaml"]:
-        if (component_dir / candidate).exists():
-            main_yaml = component_dir / candidate
-            break
+    component_type = component_dir.parent.name
+    main_yaml_name = COMPONENT_FILES.get(component_type)
+    main_yaml = component_dir / main_yaml_name if main_yaml_name else None
 
-    if main_yaml is None:
+    if main_yaml is None or not main_yaml.exists():
         return
 
     with open(main_yaml) as f:
@@ -54,10 +65,11 @@ def stamp_component(component_dir: Path, ref: str, now: str):
         with open(metadata_path) as f:
             existing = yaml.safe_load(f) or {}
 
+    inferred_kind = COMPONENT_KINDS.get(component_type, "unknown")
     metadata = {
-        "name": data["name"],
-        "kind": data.get("kind", "unknown"),
-        "version": data.get("version", "0.0.0"),
+        "name": data.get("name", existing.get("name", component_dir.name)),
+        "kind": data.get("kind", existing.get("kind", inferred_kind)),
+        "version": data.get("version", existing.get("version", "0.0.0")),
         "build": get_short_sha(ref),
         "published_at": now,
         "reviewed_by": existing.get("reviewed_by", "bot"),
