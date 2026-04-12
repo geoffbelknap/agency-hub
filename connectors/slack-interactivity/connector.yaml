@@ -2,10 +2,9 @@ kind: connector
 name: slack-interactivity
 version: "1.0.0"
 description: >
-  Receives Slack Interactivity & Shortcuts payloads, verifies signed
-  requests, normalizes interactive events, and routes them into Agency.
-  Provides generic modal lifecycle MCP tools for Slack-native structured
-  interaction flows.
+  Receives Slack Interactivity & Shortcuts payloads, verifies signed requests,
+  routes human approval clicks through the Agency event bus, and exposes Slack
+  modal plus consent-issuer authority tools.
 author: geoffbelknap
 license: Apache-2.0
 
@@ -18,7 +17,7 @@ requires:
       type: secret
       scope: service-grant
     - name: slack_bot_token
-      description: Slack bot OAuth token used for modal view APIs
+      description: Slack bot OAuth token used for modal and approval-card APIs
       type: secret
       scope: service-grant
       setup_url: "https://api.slack.com/apps"
@@ -38,21 +37,39 @@ source:
     header: X-Slack-Signature
     timestamp_header: X-Slack-Request-Timestamp
     prefix: "v0="
+    max_skew_seconds: 300
 
 config:
   interactivity_target_agent:
     type: string
     required: true
     description: Agent that owns the deployment's Block Kit UX.
+  consent_issuer:
+    type: bool
+    default: false
+    description: Enable approval-card tools and token issuance.
+  consent_issuer_config:
+    type: object
+    description: Deployment-scoped consent issuer configuration.
 
 routes:
+  - match:
+      payload_type: block_actions
+      action_id:
+        - consent_approve
+        - consent_reject
+    target:
+      runtime_node: slack_interactivity_authority
+      runtime_event: approval_action
+
   - match:
       payload_type: block_actions
     target:
       agent: "${interactivity_target_agent}"
     brief: >
       Slack block action received from {{ user.id }}.
-      Actions: {{ actions }}
+      Action: {{ action_id }}
+      Trigger: {{ trigger_id }}
 
   - match:
       payload_type: view_submission
@@ -86,74 +103,127 @@ routes:
       Slack modal closed by {{ user.id }}.
       Callback: {{ view.callback_id }}
 
-mcp:
-  name: slack-interactivity
-  credential: slack_bot_token
-  api_base: "https://slack.com"
-  tools:
-    - name: slack_view_open
-      method: POST
-      path: /api/views.open
-      description: Open a Slack modal view from a valid trigger_id.
-      parameters:
-        trigger_id:
-          type: string
-          description: Slack trigger ID
-          required: true
-        view:
-          type: object
-          description: Slack modal view payload
-          required: true
+tools:
+  - name: slack_view_open
+    description: Open a Slack modal view from a valid trigger_id.
+    input_schema:
+      trigger_id:
+        type: string
+      view:
+        type: object
+    returns:
+      view_id:
+        type: string
+      view_hash:
+        type: string
 
-    - name: slack_view_update
-      method: POST
-      path: /api/views.update
-      description: Update an existing Slack modal view.
-      parameters:
-        view_id:
-          type: string
-          description: Slack view ID
-          required: true
-        view:
-          type: object
-          description: Slack modal view payload
-          required: true
-        hash:
-          type: string
-          description: Optional optimistic concurrency hash
+  - name: slack_view_update
+    description: Update an existing Slack modal view.
+    input_schema:
+      view_id:
+        type: string
+      view:
+        type: object
+      view_hash:
+        type: string
+    returns:
+      view_id:
+        type: string
+      view_hash:
+        type: string
 
-    - name: slack_view_push
-      method: POST
-      path: /api/views.push
-      description: Push a new view onto an existing Slack modal stack.
-      parameters:
-        trigger_id:
-          type: string
-          description: Slack trigger ID
-          required: true
-        view:
-          type: object
-          description: Slack modal view payload
-          required: true
+  - name: slack_view_push
+    description: Push a new Slack modal view onto the stack.
+    input_schema:
+      trigger_id:
+        type: string
+      view:
+        type: object
+    returns:
+      view_id:
+        type: string
+      view_hash:
+        type: string
 
-    - name: slack_interaction_response
-      method: POST
-      path: /api/chat.postMessage
-      description: >
-        Best-effort fallback response tool for posting an interaction follow-up
-        into a channel when modal lifecycle APIs are not appropriate.
-      parameters:
-        channel:
-          type: string
-          description: Slack channel ID
-          required: true
-        text:
-          type: string
-          description: Message body
-          required: true
-        thread_ts:
-          type: string
-          description: Optional thread timestamp for threaded replies
+  - name: consent_open_approval_card
+    description: Start a human approval flow and post the approval card into Slack.
+    requires_config: consent_issuer
+    input_schema:
+      channel:
+        type: string
+      operation_kind:
+        type: string
+      operation_target:
+        type: string
+      operation_description:
+        type: string
+      card_blocks:
+        type: object
+    returns:
+      pending_approval_id:
+        type: string
+      posted_message_ts:
+        type: string
+
+  - name: consent_poll_approval
+    description: Poll a pending approval and retrieve the token once ready.
+    requires_config: consent_issuer
+    input_schema:
+      pending_approval_id:
+        type: string
+    returns:
+      status:
+        type: string
+      consent_token:
+        type: string
+      witnesses_collected:
+        type: array
+      expires_at:
+        type: string
+
+  - name: consent_cancel_approval
+    description: Cancel a pending approval that has not yet completed.
+    requires_config: consent_issuer
+    input_schema:
+      pending_approval_id:
+        type: string
+
+runtime:
+  executor:
+    kind: slack_interactivity
+    base_url: https://slack.com
+    auth:
+      type: bearer
+      binding: slack_bot_token
+    actions:
+      slack_view_open:
+        method: POST
+        path: /api/views.open
+        body:
+          trigger_id: trigger_id
+          view: view
+      slack_view_update:
+        method: POST
+        path: /api/views.update
+        body:
+          view_id: view_id
+          view: view
+          hash: view_hash
+      slack_view_push:
+        method: POST
+        path: /api/views.push
+        body:
+          trigger_id: trigger_id
+          view: view
+      consent_open_approval_card:
+        method: POST
+        path: /api/chat.postMessage
+      consent_poll_approval:
+        method: GET
+        path: /local/poll
+      consent_cancel_approval:
+        method: POST
+        path: /api/chat.update
 
 rate_limits:
   max_per_hour: 2000
