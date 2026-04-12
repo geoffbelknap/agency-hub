@@ -92,7 +92,7 @@ jobs:
 
       # Exit 2: security surface changed, needs human review
       - name: Flag for human review
-        if: steps.review.outputs.exit_code == '2'
+        if: steps.review.outputs.exit_code == '2' && !contains(join(github.event.pull_request.labels.*.name, ','), 'ask-approved')
         run: |
           gh pr comment "$PR_NUMBER" \
             --body "**Review Bot: NEEDS HUMAN REVIEW**
@@ -106,6 +106,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Human review acknowledged
+        if: steps.review.outputs.exit_code == '2' && contains(join(github.event.pull_request.labels.*.name, ','), 'ask-approved')
+        run: echo "ASK human approval already recorded via ask-approved label"
 
       # Exit 1: validation failure, block merge
       - name: Block on validation failure
@@ -123,7 +127,7 @@ jobs:
       # GATE: validation failures and security-surface changes both block merge
       # until a human completes review outside the bot.
       - name: Status check gate
-        if: steps.review.outputs.exit_code == '1' || steps.review.outputs.exit_code == '2'
+        if: steps.review.outputs.exit_code == '1' || (steps.review.outputs.exit_code == '2' && !contains(join(github.event.pull_request.labels.*.name, ','), 'ask-approved'))
         env:
           EXIT_CODE: ${{ steps.review.outputs.exit_code }}
         run: |

@@ -1,6 +1,6 @@
 kind: connector
 name: slack-interactivity
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Receives Slack Interactivity & Shortcuts payloads, verifies signed requests,
   routes human approval clicks through the Agency event bus, and exposes Slack
