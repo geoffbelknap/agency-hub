@@ -39,6 +39,11 @@ jobs:
             echo "No component changes — skipping review."
           else
             echo "has_components=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "changed_files<<EOF"
+              echo "$CHANGED"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -82,6 +87,38 @@ jobs:
           EXIT_CODE=$?
           set -e
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "ask_outcome=ASK-Pass" >> "$GITHUB_OUTPUT"
+          elif [ "$EXIT_CODE" = "1" ]; then
+            echo "ask_outcome=ASK-Fail" >> "$GITHUB_OUTPUT"
+          else
+            echo "ask_outcome=ASK-Partial" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write assurance summary
+        if: steps.changes.outputs.has_components == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changes.outputs.changed_files }}
+          ASK_OUTCOME: ${{ steps.review.outputs.ask_outcome }}
+        run: |
+          args=()
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            args+=(--component-file "$file")
+          done <<< "$CHANGED_FILES"
+          python3 scripts/write_assurance.py \
+            "${args[@]}" \
+            --result "$ASK_OUTCOME" \
+            --review-scope package-change \
+            --reviewer-type automated \
+            --output assurance-summary.json
+
+      - name: Upload assurance summary
+        if: steps.changes.outputs.has_components == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: assurance-summary
+          path: assurance-summary.json
 
       # Exit 0: routine changes, auto-approve
       - name: Auto-approve
