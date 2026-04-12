@@ -50,6 +50,18 @@ jobs:
         if: steps.changes.outputs.has_components == 'true'
         run: pip install pyyaml
 
+      - name: Check for ASK approval label
+        if: steps.changes.outputs.has_components == 'true'
+        id: approval
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          if echo "$LABELS_JSON" | grep -q '"ask-approved"'; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "approved=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Run review bot and capture exit code (0=auto-approve, 1=blocked, 2=needs-review)
       - name: Run review bot
         if: steps.changes.outputs.has_components == 'true'
@@ -92,7 +104,7 @@ jobs:
 
       # Exit 2: security surface changed, needs human review
       - name: Flag for human review
-        if: steps.review.outputs.exit_code == '2' && !contains(join(github.event.pull_request.labels.*.name, ','), 'ask-approved')
+        if: steps.review.outputs.exit_code == '2' && steps.approval.outputs.approved != 'true'
         run: |
           gh pr comment "$PR_NUMBER" \
             --body "**Review Bot: NEEDS HUMAN REVIEW**
@@ -108,7 +120,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Human review acknowledged
-        if: steps.review.outputs.exit_code == '2' && contains(join(github.event.pull_request.labels.*.name, ','), 'ask-approved')
+        if: steps.review.outputs.exit_code == '2' && steps.approval.outputs.approved == 'true'
         run: echo "ASK human approval already recorded via ask-approved label"
 
       # Exit 1: validation failure, block merge
@@ -127,7 +139,7 @@ jobs:
       # GATE: validation failures and security-surface changes both block merge
       # until a human completes review outside the bot.
       - name: Status check gate
-        if: steps.review.outputs.exit_code == '1' || (steps.review.outputs.exit_code == '2' && !contains(join(github.event.pull_request.labels.*.name, ','), 'ask-approved'))
+        if: steps.review.outputs.exit_code == '1' || (steps.review.outputs.exit_code == '2' && steps.approval.outputs.approved != 'true')
         env:
           EXIT_CODE: ${{ steps.review.outputs.exit_code }}
         run: |
