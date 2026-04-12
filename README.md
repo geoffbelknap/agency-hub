@@ -4,6 +4,14 @@ The package manager for [Agency](https://github.com/geoffbelknap/agency). Discov
 
 **Want to contribute a component?** See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Assurance
+
+Agency Hub separates publication from assurance.
+
+- publication makes an artifact available from a hub
+- assurance records verified review outcomes and publisher identity facts
+- local Agency policy decides what may be installed or activated
+
 ## Install a Component
 
 ```bash

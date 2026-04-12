@@ -1,0 +1,13 @@
+{
+  "publisher_id": "org:agency-platform",
+  "kind": "organization",
+  "display_name": "Agency Platform",
+  "verification": {
+    "status": "verified",
+    "method": "github_repository_control",
+    "verified_at": "2026-04-12T00:00:00Z"
+  },
+  "repository_bindings": [
+    "github.com/geoffbelknap/agency-hub"
+  ]
+}

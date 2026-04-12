@@ -1,6 +1,6 @@
 kind: connector
 name: google-drive-admin
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Bounded Google Drive administration connector for managing sharing on
   explicitly approved files and folders. Tool-only connector with service
@@ -16,6 +16,10 @@ requires:
       scope: service-grant
       grant_name: google-drive-admin
       setup_url: "https://console.cloud.google.com/iam-admin/serviceaccounts"
+  auth:
+    type: google_service_account
+    scopes:
+      - https://www.googleapis.com/auth/drive
   egress_domains:
     - www.googleapis.com
     - oauth2.googleapis.com
@@ -53,6 +57,7 @@ mcp:
         sendNotificationEmail:
           type: boolean
           description: Whether Drive should send its standard share email
+      query_params: [sendNotificationEmail]
 
     - name: drive_share_folder
       method: POST
@@ -77,6 +82,7 @@ mcp:
         sendNotificationEmail:
           type: boolean
           description: Whether Drive should send its standard share email
+      query_params: [sendNotificationEmail]
 
     - name: drive_list_file_permissions
       method: GET
@@ -90,6 +96,7 @@ mcp:
         fields:
           type: string
           description: Optional partial response selector
+      query_params: [fields]
 
     - name: drive_list_folder_permissions
       method: GET
@@ -103,6 +110,7 @@ mcp:
         fields:
           type: string
           description: Optional partial response selector
+      query_params: [fields]
 
     - name: drive_remove_file_permission
       method: DELETE
@@ -156,6 +164,7 @@ mcp:
         supportsAllDrives:
           type: boolean
           description: Enable shared drive support
+      query_params: [q, pageSize, pageToken, fields, includeItemsFromAllDrives, supportsAllDrives]
 
 rate_limits:
   max_per_hour: 600

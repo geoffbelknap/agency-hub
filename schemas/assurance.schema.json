@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agency Hub Assurance Statement",
+  "type": "object",
+  "required": [
+    "artifact",
+    "issuer",
+    "statement_type",
+    "result",
+    "review_scope",
+    "reviewer_type",
+    "policy_version",
+    "timestamp"
+  ],
+  "properties": {
+    "artifact": {
+      "type": "object",
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": {"type": "string"},
+        "name": {"type": "string"},
+        "version": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "issuer": {
+      "type": "object",
+      "required": ["hub_id", "statement_id"],
+      "properties": {
+        "hub_id": {"type": "string"},
+        "statement_id": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "statement_type": {"type": "string"},
+    "result": {
+      "type": "string",
+      "enum": ["ASK-Pass", "ASK-Partial", "ASK-Fail", "verified", "failed"]
+    },
+    "review_scope": {"type": "string"},
+    "reviewer_type": {
+      "type": "string",
+      "enum": ["automated", "human", "combined"]
+    },
+    "policy_version": {"type": "string"},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

@@ -50,6 +50,18 @@ jobs:
         if: steps.changes.outputs.has_components == 'true'
         run: pip install pyyaml
 
+      - name: Check for ASK approval label
+        if: steps.changes.outputs.has_components == 'true'
+        id: approval
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          if echo "$LABELS_JSON" | grep -q '"ask-approved"'; then
+            echo "approved=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "approved=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Run review bot and capture exit code (0=auto-approve, 1=blocked, 2=needs-review)
       - name: Run review bot
         if: steps.changes.outputs.has_components == 'true'
@@ -91,9 +103,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
       # Exit 2: security surface changed, needs human review
-      # This is advisory for now: signal clearly, but do not block merge.
       - name: Flag for human review
-        if: steps.review.outputs.exit_code == '2'
+        if: steps.review.outputs.exit_code == '2' && steps.approval.outputs.approved != 'true'
         run: |
           gh pr comment "$PR_NUMBER" \
             --body "**Review Bot: NEEDS HUMAN REVIEW**
@@ -108,6 +119,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
+      - name: Human review acknowledged
+        if: steps.review.outputs.exit_code == '2' && steps.approval.outputs.approved == 'true'
+        run: echo "ASK human approval already recorded via ask-approved label"
+
       # Exit 1: validation failure, block merge
       - name: Block on validation failure
         if: steps.review.outputs.exit_code == '1'
@@ -121,13 +136,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      # GATE: only true validation failures (exit 1) block merge.
-      # Exit 2 is advisory so personal-repo PR flow stays lightweight while
-      # still signaling security-surface changes clearly.
+      # GATE: validation failures and security-surface changes both block merge
+      # until a human completes review outside the bot.
       - name: Status check gate
-        if: steps.review.outputs.exit_code == '1'
+        if: steps.review.outputs.exit_code == '1' || (steps.review.outputs.exit_code == '2' && steps.approval.outputs.approved != 'true')
         env:
           EXIT_CODE: ${{ steps.review.outputs.exit_code }}
         run: |
-          echo "::error::Schema validation failed — fix errors before merging"
+          if [ "$EXIT_CODE" = "1" ]; then
+            echo "::error::Schema validation failed — fix errors before merging"
+          else
+            echo "::error::ASK review requires human approval before merging"
+          fi
           exit 1
