@@ -57,7 +57,15 @@ mcp:
         sendNotificationEmail:
           type: boolean
           description: Whether Drive should send its standard share email
+        consent_token:
+          type: string
+          description: Consent token authorizing a permission grant on this file
       query_params: [sendNotificationEmail]
+      whitelist_check: file_id
+      requires_consent_token:
+        operation_kind: grant_drive_file_permission
+        token_input_field: consent_token
+        target_input_field: file_id
 
     - name: drive_share_folder
       method: POST
@@ -82,7 +90,15 @@ mcp:
         sendNotificationEmail:
           type: boolean
           description: Whether Drive should send its standard share email
+        consent_token:
+          type: string
+          description: Consent token authorizing a permission grant on this folder
       query_params: [sendNotificationEmail]
+      whitelist_check: folder_id
+      requires_consent_token:
+        operation_kind: grant_drive_folder_permission
+        token_input_field: consent_token
+        target_input_field: folder_id
 
     - name: drive_list_file_permissions
       method: GET
@@ -97,6 +113,7 @@ mcp:
           type: string
           description: Optional partial response selector
       query_params: [fields]
+      whitelist_check: file_id
 
     - name: drive_list_folder_permissions
       method: GET
@@ -111,6 +128,7 @@ mcp:
           type: string
           description: Optional partial response selector
       query_params: [fields]
+      whitelist_check: folder_id
 
     - name: drive_remove_file_permission
       method: DELETE
@@ -125,6 +143,14 @@ mcp:
           type: string
           description: Permission ID to remove
           required: true
+        consent_token:
+          type: string
+          description: Consent token authorizing removal of a permission from this file
+      whitelist_check: file_id
+      requires_consent_token:
+        operation_kind: revoke_drive_file_permission
+        token_input_field: consent_token
+        target_input_field: file_id
 
     - name: drive_remove_folder_permission
       method: DELETE
@@ -139,6 +165,14 @@ mcp:
           type: string
           description: Permission ID to remove
           required: true
+        consent_token:
+          type: string
+          description: Consent token authorizing removal of a permission from this folder
+      whitelist_check: folder_id
+      requires_consent_token:
+        operation_kind: revoke_drive_folder_permission
+        token_input_field: consent_token
+        target_input_field: folder_id
 
     - name: drive_list_folder_contents
       method: GET
