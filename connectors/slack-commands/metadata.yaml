@@ -1,6 +1,6 @@
 name: slack-commands
 kind: connector
 version: 1.0.0
-build: local
-published_at: '2026-04-11T00:00:00Z'
+build: 1b31642
+published_at: '2026-04-13T23:51:53.453239+00:00'
 reviewed_by: codex
